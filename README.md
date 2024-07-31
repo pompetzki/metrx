@@ -11,3 +11,9 @@ To test, run example:
 ```bash
 python examples/example.py
 ```
+
+## ToDo's
+- [ ] Combine run() and init_state() for the distance measures 
+- [ ] Add Wasserstein distance of batch-wise particles
+- [ ] Add tests
+    
