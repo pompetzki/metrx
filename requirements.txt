@@ -1,3 +1,4 @@
+
 absl-py==2.1.0
 chex==0.1.86
 cloudpickle==3.0.0
@@ -20,7 +21,7 @@ jaxtyping==0.2.33
 kiwisolver==1.4.5
 lineax==0.0.5
 markdown-it-py==3.0.0
-matplotlib==3.9.1
+matplotlib==3.9.1.post1
 mdurl==0.1.2
 ml-dtypes==0.4.0
 msgpack==1.0.8
@@ -32,20 +33,17 @@ orbax-checkpoint==0.5.23
 ott-jax==0.4.7
 packaging==24.1
 pillow==10.4.0
-pip==24.0
-protobuf==5.27.2
+protobuf==5.27.3
 Pygments==2.18.0
 pyparsing==3.1.2
 python-dateutil==2.9.0.post0
-PyYAML==6.0.1
+PyYAML==6.0.2
 rich==13.7.1
 scipy==1.14.0
-setuptools==69.5.1
 six==1.16.0
 tensorflow-probability==0.24.0
-tensorstore==0.1.63
+tensorstore==0.1.64
 toolz==0.12.1
 typeguard==2.13.3
 typing_extensions==4.12.2
-wheel==0.43.0
 zipp==3.19.2
