@@ -165,8 +165,7 @@ def main(**kwargs: Dict) -> None:
     for _Measure in [DistanceMeasures, StatisticalMeasures]:
         for _key in _Measure._registry.keys():
             _measure = _Measure.create_instance(_key)
-            state = _measure.init_state(x, y)
-            costs = _measure(state)
+            costs = _measure(x, y)
             cost_dict.update(
                 {
                     f"{_key}": {

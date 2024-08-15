@@ -1,4 +1,4 @@
-name: metriX_env2
+name: metriX_env
 channels:
   - defaults
 dependencies:

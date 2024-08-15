@@ -91,9 +91,9 @@ class StatisticalMeasures(ABC):
         return self.run(*args, **kwargs)
 
     @abstractmethod
-    def init_state(self, *args, **kwargs) -> Dict:
+    def run(self, *args, **kwargs) -> chex.Array:
         """
-        Initialize the state for the statistical measure.
+        Estimate the statistical measure.
 
         Parameters
         ----------
@@ -101,23 +101,6 @@ class StatisticalMeasures(ABC):
             The arguments to pass to the method.
         kwargs: `Dict`
             The keyword arguments to pass to the method.
-
-        Returns
-        -------
-        `Dict`
-            The state of the statistical measure.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def run(self, state: Dict) -> chex.Array:
-        """
-        Estimate the statistical measure.
-
-        Parameters
-        ----------
-        state: `Dict`
-            The state of the distance measure.
 
         Returns
         -------
@@ -216,9 +199,9 @@ class RelativeEntropy(StatisticalMeasures):
         """
         return cls.construct(*args, **kwargs)
 
-    def init_state(self, x: chex.Array, y: chex.Array) -> Dict:
+    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
-        Initialize the state of the relative entropy divergence measure.
+        Run the relative entropy divergence measure.
 
         Parameters
         ----------
@@ -229,41 +212,19 @@ class RelativeEntropy(StatisticalMeasures):
 
         Returns
         -------
-        `Dict`
-            A dictionary of the mean and the lower triangular matrix of the Cholesky decomposition of the covariance
-            matrix for both x and y.
-        """
-        mean_x, tri_lower_x = fit_gaussian2data(x, self.reg)
-        mean_y, tri_lower_y = fit_gaussian2data(y, self.reg)
-        return dict({
-            "mean_x": mean_x,
-            "tri_lower_x": tri_lower_x,
-            "mean_y": mean_y,
-            "tri_lower_y": tri_lower_y,
-        })
-
-    def run(self, state: Dict) -> chex.Array:
-        """
-        Run the relative entropy divergence measure.
-
-        Parameters
-        ----------
-        state: `Dict`
-            A dictionary of the mean and the lower triangular matrix of the Cholesky decomposition of the covariance
-            matrix for both x and y.
-
-        Returns
-        -------
         chex.Array
             The relative entropy divergence measure of shape (1, ).
         """
+        mean_x, tri_lower_x = fit_gaussian2data(x, self.reg)
+        mean_y, tri_lower_y = fit_gaussian2data(y, self.reg)
+
         mvnrml_x = distrax.MultivariateNormalTri(
-            loc=state["mean_x"].squeeze(),
-            scale_tri=state["tri_lower_x"].squeeze()
+            loc=mean_x.squeeze(),
+            scale_tri=tri_lower_x.squeeze()
         )
         mvnrml_y = distrax.MultivariateNormalTri(
-            loc=state["mean_y"].squeeze(),
-            scale_tri=state["tri_lower_y"].squeeze()
+            loc=mean_y.squeeze(),
+            scale_tri=tri_lower_y.squeeze()
         )
 
         if self.reverse:
@@ -366,9 +327,9 @@ class FrechetInceptionDistance(StatisticalMeasures):
         """
         return cls.construct(*args, **kwargs)
 
-    def init_state(self, x: chex.Array, y: chex.Array) -> Dict:
+    def run(self,  x: chex.Array, y: chex.Array) -> chex.Array:
         """
-        Initialize the state of the Frechet Inception Distance measure.
+        Run the total Frechet Inception Distance measure.
 
         Parameters
         ----------
@@ -379,43 +340,19 @@ class FrechetInceptionDistance(StatisticalMeasures):
 
         Returns
         -------
-        `Dict`
-            A dictionary of the mean and the lower triangular matrix of the Cholesky decomposition of the covariance
-            matrix for both x and y. The shape of the mean is (1, N, D) and the shape of the lower triangular matrix is
-            (1, N, D, D).
-        """
-        mean_x, tri_lower_x = fit_gaussian2data(x, self.reg)
-        mean_y, tri_lower_y = fit_gaussian2data(y, self.reg)
-        return dict({
-            "mean_x": mean_x,
-            "tri_lower_x": tri_lower_x,
-            "mean_y": mean_y,
-            "tri_lower_y": tri_lower_y,
-            })
-
-    def run(self, state: Dict) -> chex.Array:
-        """
-        Run the total Frechet Inception Distance measure.
-
-        Parameters
-        ----------
-        state: `Dict`
-            A dictionary of the mean and the lower triangular matrix of the Cholesky decomposition of the covariance
-            matrix for both x and y. The shape of the mean is (1, N, D) and the shape of the lower triangular matrix is
-            (1, N, D, D).
-
-        Returns
-        -------
         `chex.Array`
             The Frechet Inception Distance measure of shape (1, ).
         """
-        delta_mean = state["mean_x"] - state["mean_y"]
+        mean_x, tri_lower_x = fit_gaussian2data(x, self.reg)
+        mean_y, tri_lower_y = fit_gaussian2data(y, self.reg)
+
+        delta_mean = mean_x - mean_y
         mean_diff = jnp.linalg.norm(delta_mean, axis=-1) ** 2
 
-        cov_x = jnp.einsum("...mi, ...ni -> ...mn", state["tri_lower_x"], state["tri_lower_x"])
+        cov_x = jnp.einsum("...mi, ...ni -> ...mn", tri_lower_x, tri_lower_x)
         trace_cov_x = jax.vmap(jax.vmap(jnp.trace))(cov_x)
 
-        cov_y = jnp.einsum("...mi, ...ni -> ...mn", state["tri_lower_y"], state["tri_lower_y"])
+        cov_y = jnp.einsum("...mi, ...ni -> ...mn", tri_lower_y, tri_lower_y)
         trace_cov_y = jax.vmap(jax.vmap(jnp.trace))(cov_y)
 
         cov_product = jnp.einsum("...mi, ...ni -> ...mn", cov_x, cov_y)
@@ -517,24 +454,6 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         """
         return cls.construct(*args, **kwargs)
 
-    def init_state(self, x: chex.Array, y: chex.Array) -> Dict:
-        """
-        Initialize the state of the Maximum Mean Discrepancy measure.
-
-        Parameters
-        ----------
-        x: `chex.Array`
-            Empirical data of shape (B_x, N_x, D).
-        y: `chex.Array`
-            Empirical data of shape (B_y, N_y, D).
-
-        Returns
-        -------
-        `Dict`
-            A dictionary of the empirical data x and y.
-        """
-        return dict({"x": x, "y": y})
-
     def _mmd_kernel(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
         Compute the Maximum Mean Discrepancy kernel between two time series data. Depending on the selected distance
@@ -553,8 +472,7 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         `chex.Array`
             The Maximum Mean Discrepancy kernel of shape (B_x, B_y).
         """
-        dist_state = self.distance.init_state(x, y)
-        distance_matrix = self.distance(dist_state)
+        distance_matrix = self.distance(x, y)
 
         def rbf_kernel(kernelized_dist: chex.Array, bandwidth: float) -> Any:
             return kernelized_dist + jnp.exp(-0.5 / bandwidth * distance_matrix), None
@@ -563,40 +481,39 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         kernelized_distance_matrix, _ = jax.lax.scan(rbf_kernel, kernelized_distance_matrix, self.bandwidths)
         return kernelized_distance_matrix
 
-    def run(self, state: Dict) -> chex.Array:
+    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
         Run the Maximum Mean Discrepancy measure.
 
         Parameters
         ----------
-        state: `Dict`
-            A dictionary of the empirical data x and y. The shape of x is (B_x, N_x, D) and the shape of y is
-            (B_y, N_y, D). Depending on the selected distance the two time series have to be of the same length
-            (N_x = N_y), .e.g., the squared Euclidean distance. However, using dynamic time warping as distance measure,
-            the two time series can have different lengths (N_x != N_y).
+        x: `chex.Array`
+            Empirical data of shape (B_x, N_x, D).
+        y: `chex.Array`
+            Empirical data of shape (B_y, N_y, D).
 
         Returns
         -------
         `chex.Array`
             The Maximum Mean Discrepancy measure of shape (1, ).
         """
-        kxx = self._mmd_kernel(state["x"], state["x"])
+        kxx = self._mmd_kernel(x, x)
         i, j = jnp.diag_indices(kxx.shape[-1])
         kxx = kxx.at[..., i, j].set(0.0)
 
-        kyy = self._mmd_kernel(state["y"], state["y"])
+        kyy = self._mmd_kernel(y, y)
         i, j = jnp.diag_indices(kyy.shape[-1])
         kyy = kyy.at[..., i, j].set(0.0)
 
-        kxy = self._mmd_kernel(state["x"], state["y"])
+        kxy = self._mmd_kernel(x, y)
 
-        n, m = state["x"].shape[0], state["y"].shape[0]
-        c_xy = 2.0 / (n * m)
+        b_x, b_y = x.shape[0], y.shape[0]
+        c_xy = 2.0 / (b_x * b_y)
         if self.unbiased:
-            c_xx = 1 / (n * (n - 1)) if n > 1 else 1 / n
-            c_yy = 1 / (m * (m - 1)) if m > 1 else 1 / m
+            c_xx = 1 / (b_x * (b_x - 1)) if b_x > 1 else 1 / b_x
+            c_yy = 1 / (b_y * (b_y - 1)) if b_y > 1 else 1 / b_y
         else:
-            c_xx = 1 / n
-            c_yy = 1 / m
+            c_xx = 1 / b_x
+            c_yy = 1 / b_y
 
         return (c_xx * jnp.sum(kxx) - c_xy * jnp.sum(kxy) + c_yy * jnp.sum(kyy))[jnp.newaxis]

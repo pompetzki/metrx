@@ -90,9 +90,9 @@ class DistanceMeasures(ABC):
         return self.run(*args, **kwargs)
 
     @abstractmethod
-    def init_state(self, *args, **kwargs) -> Dict:
+    def run(self, *args, **kwargs) -> chex.Array:
         """
-        Initialize the state for the distance measure.
+        Estimate the distance measure.
 
         Parameters
         ----------
@@ -100,23 +100,6 @@ class DistanceMeasures(ABC):
             The arguments to pass to the method.
         kwargs: `Dict`
             The keyword arguments to pass to the method.
-
-        Returns
-        -------
-        `Dict`
-            The state of the distance measure.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def run(self, state: Dict) -> chex.Array:
-        """
-        Estimate the distance measure.
-
-        Parameters
-        ----------
-        state: `Dict`
-            The state of the distance measure.
 
         Returns
         -------
@@ -208,9 +191,9 @@ class MinkowskiDistance(DistanceMeasures):
         """
         return cls.construct(*args, **kwargs)
 
-    def init_state(self, x: chex.Array, y: Optional[chex.Array] = None) -> Dict:
+    def run(self, x: chex.Array, y: Optional[chex.Array] = None) -> chex.Array:
         """
-        Initialize the state for the Minkowski distance measure.
+        Estimate the Minkowski distance measure.
 
         Parameters
         ----------
@@ -221,8 +204,8 @@ class MinkowskiDistance(DistanceMeasures):
 
         Returns
         -------
-        `Dict`:
-            The state of the Minkowski distance measure.
+        `chex.Array`:
+            The estimated Minkowski distance of shape (b_x, b_y).
         """
         assert x.shape[-1] == y.shape[-1], print(
             f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but d doesn't match. "
@@ -239,23 +222,7 @@ class MinkowskiDistance(DistanceMeasures):
         else:
             y = jnp.expand_dims(y, axis=0)
 
-        return dict({"x": x, "y": y})
-
-    def run(self, state: Dict) -> chex.Array:
-        """
-        Estimate the Minkowski distance measure.
-
-        Parameters
-        ----------
-        state: `Dict`
-            The state of the Minkowski distance measure.
-
-        Returns
-        -------
-        `chex.Array`:
-            The estimated Minkowski distance of shape (b_x, b_y).
-        """
-        x_centered = state["x"] - state["y"]
+        x_centered = x - y
         distance = jnp.linalg.norm(x_centered, axis=-1, ord=self.p)
         if self.mean:
             return jnp.mean(distance, axis=-1)
@@ -335,9 +302,9 @@ class EuclideanDistance(DistanceMeasures):
         """
         return cls.construct(*args, **kwargs)
 
-    def init_state(self, x: chex.Array, y: Optional[chex.Array] = None) -> Dict:
+    def run(self, x: chex.Array, y: Optional[chex.Array] = None) -> chex.Array:
         """
-        Initialize the state for the Euclidean distance measure.
+        Estimate the Euclidean distance measure.
 
         Parameters
         ----------
@@ -348,8 +315,8 @@ class EuclideanDistance(DistanceMeasures):
 
         Returns
         -------
-        `Dict`:
-            The state of the Euclidean distance measure.
+        `chex.Array`:
+            The estimated Euclidean distance of shape (b_x, b_y).
         """
         assert x.shape[-1] == y.shape[-1], print(
             f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but d doesn't match. "
@@ -366,23 +333,7 @@ class EuclideanDistance(DistanceMeasures):
         else:
             y = jnp.expand_dims(y, axis=0)
 
-        return dict({"x": x, "y": y})
-
-    def run(self, state: Dict) -> chex.Array:
-        """
-        Estimate the Euclidean distance measure.
-
-        Parameters
-        ----------
-        state: `Dict`
-            The state of the Euclidean distance measure.
-
-        Returns
-        -------
-        `chex.Array`:
-            The estimated Euclidean distance of shape (b_x, b_y).
-        """
-        x_centered = state["x"] - state["y"]   # (b_x, b_mu, N, D)
+        x_centered = x - y  # (b_x, b_mu, N, D)
         squared_distance = jnp.linalg.norm(x_centered, axis=-1) # (b_x, b_mu, N)
         if self.mean:
             return jnp.mean(squared_distance, axis=-1)
@@ -416,14 +367,16 @@ class SquaredEuclideanDistance(EuclideanDistance):
     `SquaredEuclideanDistance`
         An instance of the squared Euclidean distance measure.
     """
-    def run(self, state: Dict) -> chex.Array:
+    def run(self, x: chex.Array, y: Optional[chex.Array] = None) -> chex.Array:
         """
         Estimate the squared Euclidean distance measure.
 
         Parameters
         ----------
-        state: `Dict`
-            The state of the Squared Euclidean distance measure.
+        x: `chex.Array`
+            The input data of shape = (b_x, N, D).
+        y: `chex.Array`, optional
+            The second input data of shape = (b_y, N, D). If not provided, y = 0.
 
         Returns
         -------
@@ -431,7 +384,22 @@ class SquaredEuclideanDistance(EuclideanDistance):
             The estimated squared Euclidean distance of shape (b_x, b_y).
 
         """
-        x_centered = state["x"] - state["y"]
+        assert x.shape[-1] == y.shape[-1], print(
+            f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but d doesn't match. "
+            f"Got x = {x.shape} and y = {y.shape}."
+        )
+        assert x.shape[1] == y.shape[1], print(
+            f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but n doesn't match. "
+            f"Got x = {x.shape} and y = {y.shape}.")
+
+        x = jnp.expand_dims(x, axis=1)
+
+        if y is None:
+            y = jnp.zeros_like(x)
+        else:
+            y = jnp.expand_dims(y, axis=0)
+
+        x_centered = x - y
         squared_distance = jnp.linalg.norm(x_centered, axis=-1) ** 2
         if self.mean:
             return jnp.mean(squared_distance, axis=-1)
@@ -511,13 +479,13 @@ class MahalanobisDistance(DistanceMeasures):
         """
         return cls.construct(*args, **kwargs)
 
-    def init_state(
+    def init_stats(
         self,
         x: chex.Array,
         mu: Optional[chex.Array] = None,
         covariance_matrix: Optional[chex.Array] = None,
         precision_matrix: Optional[chex.Array] = None
-        ) -> Dict:
+        ) -> Sequence:
         """
         Initialize the state for the Mahalanobis distance measure. If the covariance matrix is provided, its lower
         triangular matrix is calculated. If the precision matrix is provided, its lower triangular matrix is calculated.
@@ -536,18 +504,13 @@ class MahalanobisDistance(DistanceMeasures):
 
         Returns
         -------
-        `Dict`:
-            The state of the Mahalanobis distance measure.
+        chex.Array :
+            The mean of the input data.
+        chex.Array :
+            The lower triangular matrix of the covariance matrix.
+        chex.Array :
+            The lower triangular matrix of the precision matrix
         """
-        assert x.shape[-1] == mu.shape[-1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and mu = (b_y, n, d) but d doesn't match. "
-            f"Got x = {x.shape} and mu = {mu.shape}."
-        )
-        assert x.shape[1] == mu.shape[1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and mu = (b_y, n, d) but n doesn't match. "
-            f"Got x = {x.shape} and mu = {mu.shape}.")
-        x = jnp.expand_dims(x, axis=1)
-
         if mu is None:
             mu = jnp.zeros_like(x)
         else:
@@ -570,46 +533,63 @@ class MahalanobisDistance(DistanceMeasures):
             lower_tri_precision = jnp.expand_dims(jnp.eye(d), [0, 1])
             lower_tri_precision = lower_tri_precision.repeat(n, axis=1).repeat(b_2, axis=0)
 
-        return dict({
-          "x": x,
-          "mu": mu,
-          "lower_tri_covariance": lower_tri_covariance,
-          "lower_tri_precision": lower_tri_precision
-        })
+        return mu, lower_tri_covariance, lower_tri_precision
 
-    def run(self, state: Dict) -> chex.Array:
+    def run(
+            self,
+            x: chex.Array,
+            mu: Optional[chex.Array] = None,
+            covariance_matrix: Optional[chex.Array] = None,
+            precision_matrix: Optional[chex.Array] = None
+    ) -> chex.Array:
         """
         Estimate the Mahalanobis distance measure.
 
         Parameters
         ----------
-        state: `Dict`
-            The state of the Mahalanobis distance measure.
+        x: `chex.Array`
+            The input data of shape = (b_x, N, D).
+        mu: `chex.Array`, optional
+            The mean of the input data of shape = (b_mu, N, D). If not provided, mu = 0.
+        covariance_matrix: `chex.Array`, optional
+            The covariance matrix of the input data of shape = (b_cov, N, D, D). If not provided, covariance_matrix = 0.
+        precision_matrix: `chex.Array`, optional
+            The precision matrix of the input data of shape = (b_prec, N, D, D). If not provided, precision_matrix = 0.
 
         Returns
         -------
         `chex.Array`:
             The estimated Mahalanobis distance of shape (b_x, b_mu).
         """
-        x_centered = state["x"] - state["mu"]
+        assert x.shape[-1] == mu.shape[-1], print(
+            f"The two inputs need to be of the shape x = (b_x, n, d) and mu = (b_y, n, d) but d doesn't match. "
+            f"Got x = {x.shape} and mu = {mu.shape}."
+        )
+        assert x.shape[1] == mu.shape[1], print(
+            f"The two inputs need to be of the shape x = (b_x, n, d) and mu = (b_y, n, d) but n doesn't match. "
+            f"Got x = {x.shape} and mu = {mu.shape}.")
+        x = jnp.expand_dims(x, axis=1)
 
-        if state["lower_tri_covariance"] is not None:
-            lower_tri = state["lower_tri_covariance"]
+        mu, lower_tri_covariance, lower_tri_precision = self.init_stats(x, mu, covariance_matrix, precision_matrix)
+
+        x_centered = x - mu
+        if lower_tri_covariance is not None:
+            lower_tri = lower_tri_covariance
             _solve_fn = jax.vmap(jax.vmap(jnp.linalg.solve))
             x_transformed = jax.vmap(_solve_fn, in_axes=[None, 0])(lower_tri, x_centered)
-        elif state["lower_tri_precision"] is not None:
-            lower_tri = state["lower_tri_precision"]
+        elif lower_tri_precision is not None:
+            lower_tri = lower_tri_precision
             x_transformed = jnp.einsum("...mn, ...n->...m", lower_tri, x_centered)
         else:
             raise ValueError("Neither covariance nor precision marices were given.")
 
-        squared_distance = jnp.linalg.norm(x_transformed, axis=-1)
+        distance = jnp.linalg.norm(x_transformed, axis=-1)
 
         if self.mean:
-            return jnp.mean(squared_distance, axis=-1)
+            return jnp.mean(distance, axis=-1)
         elif self.median:
-            return jnp.median(squared_distance, axis=-1)
-        return jnp.sum(squared_distance, axis=-1)
+            return jnp.median(distance, axis=-1)
+        return jnp.sum(distance, axis=-1)
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -638,28 +618,51 @@ class SquaredMahalanobisDistance(MahalanobisDistance):
         An instance of the squared Mahalanobis distance measure.
     """
 
-    def run(self, state: Dict) -> chex.Array:
+    def run(
+            self,
+            x: chex.Array,
+            mu: Optional[chex.Array] = None,
+            covariance_matrix: Optional[chex.Array] = None,
+            precision_matrix: Optional[chex.Array] = None
+    ) -> chex.Array:
         """
         Estimate the Mahalanobis distance measure.
 
         Parameters
         ----------
-        state: `Dict`
-            The state of the Mahalanobis distance measure.
+        x: `chex.Array`
+            The input data of shape = (b_x, N, D).
+        mu: `chex.Array`, optional
+            The mean of the input data of shape = (b_mu, N, D). If not provided, mu = 0.
+        covariance_matrix: `chex.Array`, optional
+            The covariance matrix of the input data of shape = (b_cov, N, D, D). If not provided, covariance_matrix = 0.
+        precision_matrix: `chex.Array`, optional
+            The precision matrix of the input data of shape = (b_prec, N, D, D). If not provided, precision_matrix = 0.
 
         Returns
         -------
         `chex.Array`:
             The estimated Mahalanobis distance of shape (b_x, b_mu).
         """
-        x_centered = state["x"] - state["mu"]
+        assert x.shape[-1] == mu.shape[-1], print(
+            f"The two inputs need to be of the shape x = (b_x, n, d) and mu = (b_y, n, d) but d doesn't match. "
+            f"Got x = {x.shape} and mu = {mu.shape}."
+        )
+        assert x.shape[1] == mu.shape[1], print(
+            f"The two inputs need to be of the shape x = (b_x, n, d) and mu = (b_y, n, d) but n doesn't match. "
+            f"Got x = {x.shape} and mu = {mu.shape}.")
+        x = jnp.expand_dims(x, axis=1)
 
-        if state["lower_tri_covariance"] is not None:
-            lower_tri = state["lower_tri_covariance"]
+        mu, lower_tri_covariance, lower_tri_precision = self.init_stats(x, mu, covariance_matrix, precision_matrix)
+
+        x_centered = x - mu
+
+        if lower_tri_covariance is not None:
+            lower_tri = lower_tri_covariance
             _solve_fn = jax.vmap(jax.vmap(jnp.linalg.solve))
             x_transformed = jax.vmap(_solve_fn, in_axes=[None, 0])(lower_tri, x_centered)
-        elif state["lower_tri_precision"] is not None:
-            lower_tri = state["lower_tri_precision"]
+        elif lower_tri_precision is not None:
+            lower_tri = lower_tri_precision
             x_transformed = jnp.einsum("...mn, ...n->...m", lower_tri, x_centered)
         else:
             raise ValueError("Neither covariance nor precision marices were given.")
@@ -747,7 +750,7 @@ class DynamicTimeWarping(DistanceMeasures):
         """
         return cls.construct(*args, **kwargs)
 
-    def init_state(self, x: chex.Array, y: chex.Array) -> Dict:
+    def init_model_matrix(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
         Initialize the state for the Dynamic Time Warping distance measure.
 
@@ -760,9 +763,10 @@ class DynamicTimeWarping(DistanceMeasures):
 
         Returns
         -------
-        `Dict`:
-            The state of the Dynamic Time Warping distance measure.
+        chex.Array:
+            The model matrix for the dynamice time warping measure of shape (b_x, b_y, n_x + n_y - 1, n_y).
         """
+
         assert x.shape[-1] == y.shape[-1], print(
             f"The two inputs need to be of the shape x = (b_x, n_x, d) and y = (b_y, n_y, d) but d doesn't match. "
             f"Got x = {x.shape} and y = {y.shape}.")
@@ -770,8 +774,7 @@ class DynamicTimeWarping(DistanceMeasures):
         def _construct_model_matrix(_x: chex.Array, _y: chex.Array) -> chex.Array:
             _x = jnp.expand_dims(_x, axis=1)
             _y = jnp.expand_dims(_y, axis=1)
-            _distance_state = self.distance.init_state(x=_x, y=_y)
-            _distance_matrix = self.distance(_distance_state)
+            _distance_matrix = self.distance(x=_x, y=_y)
 
             _h, _ = _distance_matrix.shape
             _rows = []
@@ -779,18 +782,18 @@ class DynamicTimeWarping(DistanceMeasures):
               _rows.append(jnp.pad(_distance_matrix[_row], (_row, _h-_row-1), constant_values=jnp.inf))
             return jnp.stack(_rows, axis=1)
 
-        return dict({
-            "model_matrix": jax.vmap(jax.vmap(_construct_model_matrix, in_axes=(None, 0)), in_axes=(0, None))(x, y)
-            })
+        return jax.vmap(jax.vmap(_construct_model_matrix, in_axes=(None, 0)), in_axes=(0, None))(x, y)
 
-    def run(self, state: Dict) -> chex.Array:
+    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
         Estimate the Dynamic Time Warping distance measure.
 
         Parameters
         ----------
-        state: `Dict`
-            The state of the Dynamic Time Warping distance measure.
+        x: `chex.Array`
+            The input data of shape = (b_x, n_x, d).
+        y: `chex.Array`
+            The second input data of shape = (b_y, n_y, d).
 
         Returns
         -------
@@ -818,7 +821,8 @@ class DynamicTimeWarping(DistanceMeasures):
             carry, ys = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
             return carry[1][-1]
 
-        return jax.vmap(jax.vmap(_run))(state["model_matrix"])
+        model_matrix = self.init_model_matrix(x, y)
+        return jax.vmap(jax.vmap(_run))(model_matrix)
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -895,7 +899,7 @@ class DiscreteFrechetDistance(DistanceMeasures):
         """
         return cls.construct(*args, **kwargs)
 
-    def init_state(self, x: chex.Array, y: chex.Array) -> Dict:
+    def init_model_matrix(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
         Initialize the state for the discrete Frechet distance measure.
 
@@ -908,17 +912,17 @@ class DiscreteFrechetDistance(DistanceMeasures):
 
         Returns
         -------
-        `Dict`:
-            The state of the Dynamic Time Warping distance measure.
+        chex.Array:
+            The model matrix for the discrete Frechet distance measure of shape (b_x, b_y, n_x + n_y - 1, n_y).
         """
         assert x.shape[-1] == y.shape[-1], print(
             f"The two inputs need to be of the shape x = (b_x, n_x, d) and y = (b_y, n_y, d) but d doesn't match. "
             f"Got x = {x.shape} and y = {y.shape}.")
+
         def _construct_model_matrix(_x: chex.Array, _y: chex.Array) -> chex.Array:
             _x = jnp.expand_dims(_x, axis=1)
             _y = jnp.expand_dims(_y, axis=1)
-            _distance_state = self.distance.init_state(x=_x, y=_y)
-            _distance_matrix = self.distance(_distance_state)
+            _distance_matrix = self.distance(x=_x, y=_y)
 
             _h, _ = _distance_matrix.shape
 
@@ -927,18 +931,18 @@ class DiscreteFrechetDistance(DistanceMeasures):
               _rows.append(jnp.pad(_distance_matrix[_row], (_row, _h-_row-1), constant_values=jnp.inf))
             return jnp.stack(_rows, axis=1)
 
-        return dict({
-            "model_matrix": jax.vmap(jax.vmap(_construct_model_matrix, in_axes=(None, 0)), in_axes=(0, None))(x, y)
-            })
+        return jax.vmap(jax.vmap(_construct_model_matrix, in_axes=(None, 0)), in_axes=(0, None))(x, y)
 
-    def run(self, state: Dict) -> chex.Array:
+    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
         Estimate the discrete Frechet distance measure.
 
         Parameters
         ----------
-        state: `Dict`
-            The state of the discrete Frechet distance measure.
+        x: `chex.Array`
+            The input data of shape = (b_x, n_x, d).
+        y: `chex.Array`
+            The second input data of shape = (b_y, n_y, d).
 
         Returns
         -------
@@ -969,7 +973,9 @@ class DiscreteFrechetDistance(DistanceMeasures):
             )
             carry, ys = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
             return carry[1][-1]
-        return jax.vmap(jax.vmap(_run))(state["model_matrix"])
+
+        model_matrix = self.init_model_matrix(x, y)
+        return jax.vmap(jax.vmap(_run))(model_matrix)
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -1054,12 +1060,10 @@ class BaseCost(CostFn):
         x, y = x[jnp.newaxis, jnp.newaxis, ...], y[jnp.newaxis, jnp.newaxis, ...]
 
         # Spatial coordinate related cost
-        spatio_dist_state = spatio_dist.init_state(x[..., :-1], y[..., :-1])
-        total_cost += spatio_weights * spatio_dist(spatio_dist_state).squeeze()
+        total_cost += spatio_weights * spatio_dist(x[..., :-1], y[..., :-1]).squeeze()
 
         # Temporal coordinate related cost
-        temporal_dist_state = temporal_dist.init_state(x[..., -1:], y[..., -1:])
-        total_cost += temporal_weights * temporal_dist(temporal_dist_state).squeeze()
+        total_cost += temporal_weights * temporal_dist(x[..., -1:], y[..., -1:]).squeeze()
         return total_cost
 
 
@@ -1163,9 +1167,9 @@ class SinkhornDistance(DistanceMeasures):
         """
         return cls.construct(*args, **kwargs)
 
-    def init_state(self, x: chex.Array, y: chex.Array) -> Any:
+    def init_geometry(self, x: chex.Array, y: chex.Array) -> Any:
         """
-        Initialize the state for the Sinkhorn distance measure.
+        Initialize the geometry for the Sinkhorn distance measure.
 
         Parameters
         ----------
@@ -1177,7 +1181,7 @@ class SinkhornDistance(DistanceMeasures):
         Returns
         -------
         `Any`
-            The state of the Sinkhorn distance measure.
+            The geometry of the Sinkhorn distance measure.
         """
         assert x.shape[-1] == y.shape[-1], print(
             f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but d doesn't match. "
@@ -1197,18 +1201,18 @@ class SinkhornDistance(DistanceMeasures):
                 geometry = pointcloud.PointCloud(_x, _y, cost_fn=self.cost_fn)
             return geometry
 
-        return dict({
-            "geometry": jax.vmap(jax.vmap(_construct_geom, in_axes=(None, 0)), in_axes=(0, None))(x, y)
-        })
+        return jax.vmap(jax.vmap(_construct_geom, in_axes=(None, 0)), in_axes=(0, None))(x, y)
 
-    def run(self, state: Dict) -> chex.Array:
+    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
         Estimate the Sinkhorn distance measure.
 
         Parameters
         ----------
-        state: `Dict`
-            The state of the Sinkhorn distance measure.
+        x: `chex.Array`
+            The input data of shape = (b_x, n_x, d).
+        y: `chex.Array`
+            The second input data of shape = (b_y, n_y, d).
 
         Returns
         -------
@@ -1222,4 +1226,5 @@ class SinkhornDistance(DistanceMeasures):
                 return solution.reg_ot_cost
             return jnp.sum(solution.matrix * solution.geom.cost_matrix)
 
-        return jax.vmap(jax.vmap(_run))(state["geometry"])
+        geometry = self.init_geometry(x, y)
+        return jax.vmap(jax.vmap(_run))(geometry)
