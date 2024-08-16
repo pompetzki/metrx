@@ -496,7 +496,7 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         `chex.Array`
             The Maximum Mean Discrepancy kernel of shape (B_x, B_y).
         """
-        distance_matrix = jax.vmap(jax.vmap(self.distance, in_axes=(0, None)), in_axes=(None, 0))(x, y)
+        distance_matrix = jax.vmap(jax.vmap(self.distance, in_axes=(None, 0)), in_axes=(0, None))(x, y)
 
         def rbf_kernel(kernelized_dist: chex.Array, bandwidth: float) -> Any:
             return kernelized_dist + jnp.exp(-0.5 / bandwidth * distance_matrix), None

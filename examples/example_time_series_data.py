@@ -162,7 +162,7 @@ def main(**kwargs: Dict) -> None:
         for _key in _Measure._registry.keys():
             _measure = _Measure.create_instance(_key)
             if isinstance(_measure, DistanceMeasures):
-                costs = jax.vmap(jax.vmap(_measure, in_axes=(0, None)), in_axes=(None, 0))(x, y)
+                costs = jax.vmap(jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None))(x, y)
             else:
                 costs = _measure(x, y)
             cost_dict.update(
