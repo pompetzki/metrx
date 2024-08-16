@@ -5,8 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from typing import Dict, Sequence
-from metriX.distance_measures import DistanceMeasures
-from metriX.statistical_measures import StatisticalMeasures
+from metriX import DistanceMeasures, StatisticalMeasures
 
 
 def _generate_trajectory(

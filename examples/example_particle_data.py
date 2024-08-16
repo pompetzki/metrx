@@ -5,9 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from typing import Dict, Sequence
-from metriX.distance_measures import DistanceMeasures
-from metriX.statistical_measures import StatisticalMeasures
-
+from metriX import DistanceMeasures, StatisticalMeasures
 
 
 def get_samples(rng_key: chex.PRNGKey, **kwargs) -> chex.Array:
