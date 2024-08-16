@@ -98,7 +98,7 @@ def get_samples(rng_key: chex.PRNGKey, **kwargs) -> chex.Array:
 
 def visualize(xy: Sequence, costs: Dict) -> None:
     """
-    Visualize generated trajectories and distance measures.
+    Visualize the generated data and the results.
 
     Parameters
     ----------
@@ -112,8 +112,6 @@ def visualize(xy: Sequence, costs: Dict) -> None:
     None
 
     """
-    x, y = xy
-
     # Set backend
     matplotlib.use("TkAgg")
 
@@ -122,10 +120,10 @@ def visualize(xy: Sequence, costs: Dict) -> None:
     ax.flatten()
 
     # Visualize trajectories
-    for taus, color in zip((x, y), ("blue", "orange")):
+    for taus, color in zip(xy, ("blue", "orange")):
         for sample in taus:
-            ax[0].plot(sample[..., 0], sample[..., 1], color=color, alpha=0.5, zorder=0)
-    ax[0].set(xlabel="Phase", ylabel="Amplitude", title="Generated Trajectories")
+            ax[0].plot(sample[..., 0], sample[..., 1], color=color, alpha=0.5)
+    ax[0].set(xlabel="x", ylabel="fy", title="Example: time-series data")
     ax[0].grid()
 
     # Visualize costs
@@ -160,12 +158,14 @@ def main(**kwargs: Dict) -> None:
     x = get_samples(rng_key_x, **kwargs["x"])
     y = get_samples(rng_key_y, **kwargs["y"])
 
-    # Calculate distance measures
     cost_dict = {}
     for _Measure in [DistanceMeasures, StatisticalMeasures]:
         for _key in _Measure._registry.keys():
             _measure = _Measure.create_instance(_key)
-            costs = _measure(x, y)
+            if isinstance(_measure, DistanceMeasures):
+                costs = jax.vmap(jax.vmap(_measure, in_axes=(0, None)), in_axes=(None, 0))(x, y)
+            else:
+                costs = _measure(x, y)
             cost_dict.update(
                 {
                     f"{_key}": {

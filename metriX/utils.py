@@ -21,9 +21,9 @@ def fit_gaussian2data(x: chex.Array, reg: float = 1e-5) -> Sequence[chex.Array]:
     Returns
     -------
     mean: chex.Array
-        Mean of the Gaussian model as array of shape (1, n, d).
+        Mean of the Gaussian model as array of shape (n, d).
     tri_lower_matrix: chex.Array
-        Lower triangular matrix of the Cholesky decomposition of the covariance matrix as array of shape (1, n, d, d).
+        Lower triangular matrix of the Cholesky decomposition of the covariance matrix as array of shape (n, d, d).
     """
     """ Fit a Gaussian model to each time step given the samples from x """
     b, t, d = x.shape
@@ -37,4 +37,4 @@ def fit_gaussian2data(x: chex.Array, reg: float = 1e-5) -> Sequence[chex.Array]:
 
     tri_lower_matrix = jax.vmap(jnp.linalg.cholesky)(covariance_matrix)
 
-    return mean, tri_lower_matrix[jnp.newaxis, ...]
+    return mean[0], tri_lower_matrix

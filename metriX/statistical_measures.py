@@ -206,25 +206,37 @@ class RelativeEntropy(StatisticalMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            Empirical data of shape (B_x, N, D).
+            Empirical data of shape (b_x, d) if particles are considered. If time series data is considered, the shape
+            is (b_x, n, d).
         y: `chex.Array`
-            Empirical data of shape (B_y, N, D).
+            Empirical data of shape (b_y, d) if particles are considered. If time series data is considered, the shape
+            is (b_x, n, d).
 
         Returns
         -------
         chex.Array
             The relative entropy divergence measure of shape (1, ).
         """
+        assert x.shape[1:] == y.shape[1:], (
+            f"The objects inside both batches need to have the same shape. Got {x.shape[1:]} and {y.shape[1:]}."
+        )
+        assert 3 >= x.ndim >= 1 and 3 >= y.ndim >= 1, (
+            f"The two batches need to be of shape (b, d, ) if particles, or (b, n, d) if time series data. "
+            f"Got x = {x.shape} and y = {y.shape}."
+        )
+        if x.ndim == 2: x = x[..., jnp.newaxis, :]
+        if y.ndim == 2: y = y[..., jnp.newaxis, :]
+
         mean_x, tri_lower_x = fit_gaussian2data(x, self.reg)
         mean_y, tri_lower_y = fit_gaussian2data(y, self.reg)
 
         mvnrml_x = distrax.MultivariateNormalTri(
-            loc=mean_x.squeeze(),
-            scale_tri=tri_lower_x.squeeze()
+            loc=mean_x,
+            scale_tri=tri_lower_x
         )
         mvnrml_y = distrax.MultivariateNormalTri(
-            loc=mean_y.squeeze(),
-            scale_tri=tri_lower_y.squeeze()
+            loc=mean_y,
+            scale_tri=tri_lower_y
         )
 
         if self.reverse:
@@ -334,15 +346,27 @@ class FrechetInceptionDistance(StatisticalMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            Empirical data of shape (B_x, N, D).
+            Empirical data of shape (b_x, d) if particles are considered. If time series data is considered, the shape
+            is (b_x, n, d).
         y: `chex.Array`
-            Empirical data of shape (B_y, N, D).
+            Empirical data of shape (b_y, d) if particles are considered. If time series data is considered, the shape
+            is (b_x, n, d).
 
         Returns
         -------
         `chex.Array`
             The Frechet Inception Distance measure of shape (1, ).
         """
+        assert x.shape[1:] == y.shape[1:], (
+            f"The objects inside both batches need to have the same shape. Got {x.shape[1:]} and {y.shape[1:]}."
+        )
+        assert 3 >= x.ndim >= 1 and 3 >= y.ndim >= 1, (
+            f"The two batches need to be of shape (b, d, ) if particles, or (b, n, d) if time series data. "
+            f"Got x = {x.shape} and y = {y.shape}."
+        )
+        if x.ndim == 2: x = x[..., jnp.newaxis, :]
+        if y.ndim == 2: y = y[..., jnp.newaxis, :]
+
         mean_x, tri_lower_x = fit_gaussian2data(x, self.reg)
         mean_y, tri_lower_y = fit_gaussian2data(y, self.reg)
 
@@ -350,15 +374,15 @@ class FrechetInceptionDistance(StatisticalMeasures):
         mean_diff = jnp.linalg.norm(delta_mean, axis=-1) ** 2
 
         cov_x = jnp.einsum("...mi, ...ni -> ...mn", tri_lower_x, tri_lower_x)
-        trace_cov_x = jax.vmap(jax.vmap(jnp.trace))(cov_x)
+        trace_cov_x = jax.vmap(jnp.trace)(cov_x)
 
         cov_y = jnp.einsum("...mi, ...ni -> ...mn", tri_lower_y, tri_lower_y)
-        trace_cov_y = jax.vmap(jax.vmap(jnp.trace))(cov_y)
+        trace_cov_y = jax.vmap(jnp.trace)(cov_y)
 
         cov_product = jnp.einsum("...mi, ...ni -> ...mn", cov_x, cov_y)
-        eig_vals, eig_vecs = jax.vmap(jax.vmap(jnp.linalg.eigh))(cov_product)
+        eig_vals, eig_vecs = jax.vmap(jnp.linalg.eigh)(cov_product)
         sqrt_cov_product = jnp.einsum("...mj,...j, ...nj->...mn", eig_vecs, jnp.sqrt(eig_vals), eig_vecs)
-        trace_sqrt_product = jax.vmap(jax.vmap(jnp.trace))(sqrt_cov_product)
+        trace_sqrt_product = jax.vmap(jnp.trace)(sqrt_cov_product)
 
         distances = mean_diff + self.alpha * (trace_cov_x + trace_cov_y - 2 * trace_sqrt_product)
 
@@ -472,7 +496,7 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         `chex.Array`
             The Maximum Mean Discrepancy kernel of shape (B_x, B_y).
         """
-        distance_matrix = self.distance(x, y)
+        distance_matrix = jax.vmap(jax.vmap(self.distance, in_axes=(0, None)), in_axes=(None, 0))(x, y)
 
         def rbf_kernel(kernelized_dist: chex.Array, bandwidth: float) -> Any:
             return kernelized_dist + jnp.exp(-0.5 / bandwidth * distance_matrix), None
@@ -488,15 +512,28 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            Empirical data of shape (B_x, N_x, D).
+            Empirical data of shape (b_x, d) if particles are considered. If time series data is considered, the shape
+            is (b_x, n_x, d).
         y: `chex.Array`
-            Empirical data of shape (B_y, N_y, D).
+            Empirical data of shape (b_y, d) if particles are considered. If time series data is considered, the shape
+            is (b_x, n_y, d).
 
         Returns
         -------
         `chex.Array`
-            The Maximum Mean Discrepancy measure of shape (1, ).
+            The Maximum Mean Discrepancy measure of shape ().
         """
+        assert x.shape[-1] == y.shape[-1], (
+            f"The objects inside both batches need to have the same dimensionality. "
+            f"Got {x.shape[1:]} and {y.shape[1:]}."
+        )
+        assert 3 >= x.ndim >= 1 and 3 >= y.ndim >= 1, (
+            f"The two batches need to be of shape (b, d, ) if particles, or (b, n, d) if time series data. "
+            f"Got x = {x.shape} and y = {y.shape}."
+        )
+        if x.ndim == 2: x = x[..., jnp.newaxis, :]
+        if y.ndim == 2: y = y[..., jnp.newaxis, :]
+
         kxx = self._mmd_kernel(x, x)
         i, j = jnp.diag_indices(kxx.shape[-1])
         kxx = kxx.at[..., i, j].set(0.0)
@@ -516,4 +553,4 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
             c_xx = 1 / b_x
             c_yy = 1 / b_y
 
-        return (c_xx * jnp.sum(kxx) - c_xy * jnp.sum(kxy) + c_yy * jnp.sum(kyy))[jnp.newaxis]
+        return (c_xx * jnp.sum(kxx) - c_xy * jnp.sum(kxy) + c_yy * jnp.sum(kyy))

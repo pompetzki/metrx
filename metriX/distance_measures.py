@@ -14,9 +14,10 @@ from typing import Sequence, Optional, Any, Dict
 @struct.dataclass
 class DistanceMeasures(ABC):
     """
-    Base class for all distance measures. The distance measures are used to calculate the similarity between two time
-    series data. The base class provides a registry to store all the implemented distance measures.
-    To create an instance of a distance measure, use the `create_instance` method.
+    Base class for all distance measures. The distance measures are used to calculate the similarity between two data
+    points. This points could be either one dimensional points or time-series data. The base class provides a registry
+    to store all the implemented distance measures. To create an instance of a distance measure, use
+    the `create_instance` method.
 
     Parameters
     ----------
@@ -115,10 +116,10 @@ class DistanceMeasures(ABC):
 @struct.dataclass
 class MinkowskiDistance(DistanceMeasures):
     """
-    Similarity measure between time series data using the Minkowski distance between the individual pairs of points.
-    This implies that the series must be of equal length. The Minkowski distance is a metric in a normed vector space.
-    It is the L_p norm of the difference between two vectors. The Minkowski distance is calculated between the two time
-    series data of shape (b_x, n, d) and (b_y, n, d). The result is of shape (b_x, b_y).
+    Similarity measure between data points using the Minkowski distance. The Minkowski distance is a metric in a normed
+    vector space. It is the L_p norm of the difference between two vectors. If data point corresponds to a time series,
+    the distance is calculated between the individual pairs of points. This implies that the series must be of equal
+    length.
 
     Parameters
     ----------
@@ -198,32 +199,31 @@ class MinkowskiDistance(DistanceMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            The input data of shape = (b_x, N, D).
+            The input data of shape (d, ) if particle, or (n, d) if time series.
         y: `chex.Array`, optional
-            The second input data of shape = (b_y, N, D). If not provided, y = 0.
+            The second input data of shape (d, ) if particle, or (n, d) if time series. If not provided, y = 0.
 
         Returns
         -------
         `chex.Array`:
-            The estimated Minkowski distance of shape (b_x, b_y).
+            The estimated Minkowski distance of shape ().
         """
-        assert x.shape[-1] == y.shape[-1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but d doesn't match. "
-            f"Got x={x.shape} and y={y.shape}."
-        )
-        assert x.shape[1] == y.shape[1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but n doesn't match. "
-            f"Got x = {x.shape} and y = {y.shape}.")
-
-        x = jnp.expand_dims(x, axis=1)
-
         if y is None:
             y = jnp.zeros_like(x)
-        else:
-            y = jnp.expand_dims(y, axis=0)
 
-        x_centered = x - y
-        distance = jnp.linalg.norm(x_centered, axis=-1, ord=self.p)
+        assert x.ndim == y.ndim and x.shape == y.shape, print(
+            f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
+        )
+        assert x.ndim <= 2 and y.ndim <= 2, print(
+            f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
+            f"Got x = {x.shape} and y = {y.shape}."
+        )
+
+        if x.ndim == 1:
+            x = jnp.expand_dims(x, axis=0)  # (n = 1, d)
+            y = jnp.expand_dims(y, axis=0)  # (n = 1, d)
+
+        distance = jnp.linalg.norm(x - y, axis=-1, ord=self.p)  # (n, )
         if self.mean:
             return jnp.mean(distance, axis=-1)
         elif self.median:
@@ -237,10 +237,10 @@ class MinkowskiDistance(DistanceMeasures):
 @struct.dataclass
 class EuclideanDistance(DistanceMeasures):
     """
-    Similarity measure between time series data using the Euclidean distance between the individual pairs of points.
-    This implies that the series must be of equal length. The Euclidean distance is a metric in a normed vector space.
-    It is the L_2 norm of the difference between two vectors. The Euclidean distance is calculated between the two time
-    series data of shape (b_x, n, d) and (b_y, n, d). The result is of shape (b_x, b_y).
+    Similarity measure between data points using the Euclidean distance. The Euclidean distance is a metric in a normed
+    vector space. It is the L_p norm of the difference between two vectors. If data point corresponds to a time series,
+    the distance is calculated between the individual pairs of points. This implies that the series must be of equal
+    length.
 
     Parameters
     ----------
@@ -309,37 +309,36 @@ class EuclideanDistance(DistanceMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            The input data of shape = (b_x, N, D).
+            The input data point of shape (d, ) if particle, or (n, d) if time series.
         y: `chex.Array`, optional
-            The second input data of shape = (b_y, N, D). If not provided, y = 0.
+            The second input data of shape (d, ) if particle, or (n, d) if time series. If not provided, y = 0.
 
         Returns
         -------
         `chex.Array`:
-            The estimated Euclidean distance of shape (b_x, b_y).
+            The estimated Euclidean distance of shape ().
         """
-        assert x.shape[-1] == y.shape[-1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but d doesn't match. "
-            f"Got x = {x.shape} and y = {y.shape}."
-        )
-        assert x.shape[1] == y.shape[1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but n doesn't match. "
-            f"Got x = {x.shape} and y = {y.shape}.")
-
-        x = jnp.expand_dims(x, axis=1)
-
         if y is None:
             y = jnp.zeros_like(x)
-        else:
-            y = jnp.expand_dims(y, axis=0)
 
-        x_centered = x - y  # (b_x, b_mu, N, D)
-        squared_distance = jnp.linalg.norm(x_centered, axis=-1) # (b_x, b_mu, N)
+        assert x.ndim == y.ndim and x.shape == y.shape, print(
+            f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
+        )
+        assert x.ndim <= 2 and y.ndim <= 2, print(
+            f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
+            f"Got x = {x.shape} and y = {y.shape}."
+        )
+
+        if x.ndim == 1:
+            x = jnp.expand_dims(x, axis=0)  # (n = 1, d)
+            y = jnp.expand_dims(y, axis=0)  # (n = 1, d)
+
+        distance = jnp.linalg.norm(x - y, axis=-1)  # (n, )
         if self.mean:
-            return jnp.mean(squared_distance, axis=-1)
+            return jnp.mean(distance, axis=-1)
         elif self.median:
-            return jnp.median(squared_distance, axis=-1)
-        return jnp.sum(squared_distance, axis=-1)
+            return jnp.median(distance, axis=-1)
+        return jnp.sum(distance, axis=-1)
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -348,10 +347,10 @@ class EuclideanDistance(DistanceMeasures):
 @struct.dataclass
 class SquaredEuclideanDistance(EuclideanDistance):
     """
-    Similarity measure between time series data using the squared Euclidean distance between the individual pairs of
-    points. This implies that the series must be of equal length. The squared Euclidean distance is not metric in a
-    normed vector space as it does not satisfy the triangle inequality. The distance is calculated between the two time
-    series data of shape (b_x, n, d) and (b_y, n, d). The result is of shape (b_x, b_y).
+    Similarity measure between a data point using the squared Euclidean distance. The distance is not metric in a normed
+    vector space as it does not satisfy the triangle inequality. If data point corresponds to a time series,
+    the distance is calculated between the individual pairs of points. This implies that the series must be of equal
+    length.
 
     Parameters
     ----------
@@ -374,33 +373,32 @@ class SquaredEuclideanDistance(EuclideanDistance):
         Parameters
         ----------
         x: `chex.Array`
-            The input data of shape = (b_x, N, D).
+            The input data point of shape (d, ) if particle, or (n, d) if time series.
         y: `chex.Array`, optional
-            The second input data of shape = (b_y, N, D). If not provided, y = 0.
+            The second input data of shape (d, ) if particle, or (n, d) if time series. If not provided, y = 0.
 
         Returns
         -------
         `chex.Array`:
-            The estimated squared Euclidean distance of shape (b_x, b_y).
+            The estimated squared Euclidean distance of shape ().
 
         """
-        assert x.shape[-1] == y.shape[-1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but d doesn't match. "
-            f"Got x = {x.shape} and y = {y.shape}."
-        )
-        assert x.shape[1] == y.shape[1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but n doesn't match. "
-            f"Got x = {x.shape} and y = {y.shape}.")
-
-        x = jnp.expand_dims(x, axis=1)
-
         if y is None:
             y = jnp.zeros_like(x)
-        else:
-            y = jnp.expand_dims(y, axis=0)
 
-        x_centered = x - y
-        squared_distance = jnp.linalg.norm(x_centered, axis=-1) ** 2
+        assert x.ndim == y.ndim and x.shape == y.shape, print(
+            f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
+        )
+        assert x.ndim <= 2 and y.ndim <= 2, print(
+            f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
+            f"Got x = {x.shape} and y = {y.shape}."
+        )
+
+        if x.ndim == 1:
+            x = jnp.expand_dims(x, axis=0)  # (n = 1, d)
+            y = jnp.expand_dims(y, axis=0)  # (n = 1, d)
+
+        squared_distance = jnp.linalg.norm(x - y, axis=-1) ** 2  # (n, )
         if self.mean:
             return jnp.mean(squared_distance, axis=-1)
         elif self.median:
@@ -414,10 +412,9 @@ class SquaredEuclideanDistance(EuclideanDistance):
 @struct.dataclass
 class MahalanobisDistance(DistanceMeasures):
     """
-    Similarity measure between time series data using the Mahalanobis distance between the individual pairs of points.
-    This implies that the series must be of equal length. The distance is calculated between a time
-    series data of shape (b_x, n, d) and a sequence of multivariate Normal distributions with mean of shape
-    (b_mu, n, d) and covariance of shape (b_cov, n, d, d). The result is of shape (b_x, b_mu).
+    Similarity measure between a data point and a multivariate Normal using the Mahalanobis distance.
+    If data point corresponds to a time series, the distance is calculated between the individual pairs.
+    This implies that the series must be of equal length.
 
     Parameters
     ----------
@@ -479,62 +476,6 @@ class MahalanobisDistance(DistanceMeasures):
         """
         return cls.construct(*args, **kwargs)
 
-    def init_stats(
-        self,
-        x: chex.Array,
-        mu: Optional[chex.Array] = None,
-        covariance_matrix: Optional[chex.Array] = None,
-        precision_matrix: Optional[chex.Array] = None
-        ) -> Sequence:
-        """
-        Initialize the state for the Mahalanobis distance measure. If the covariance matrix is provided, its lower
-        triangular matrix is calculated. If the precision matrix is provided, its lower triangular matrix is calculated.
-        We use the identity matrix if neither covariance nor precision matrices are provided.
-
-        Parameters
-        ----------
-        x: `chex.Array`
-            The input data of shape = (b_x, N, D).
-        mu: `chex.Array`, optional
-            The mean of the input data of shape = (b_mu, N, D). If not provided, mu = 0.
-        covariance_matrix: `chex.Array`, optional
-            The covariance matrix of the input data of shape = (b_cov, N, D, D). If not provided, covariance_matrix = 0.
-        precision_matrix: `chex.Array`, optional
-            The precision matrix of the input data of shape = (b_prec, N, D, D). If not provided, precision_matrix = 0.
-
-        Returns
-        -------
-        chex.Array :
-            The mean of the input data.
-        chex.Array :
-            The lower triangular matrix of the covariance matrix.
-        chex.Array :
-            The lower triangular matrix of the precision matrix
-        """
-        if mu is None:
-            mu = jnp.zeros_like(x)
-        else:
-            mu = jnp.expand_dims(mu, axis=0)
-
-        lower_tri_covariance = None
-        if covariance_matrix is not None:
-            if covariance_matrix.ndim == 2:
-                covariance_matrix = covariance_matrix[jnp.newaxis, ...]
-            lower_tri_covariance = jax.vmap(jnp.linalg.cholesky)(covariance_matrix)
-
-        lower_tri_precision = None
-        if precision_matrix is not None:
-            if precision_matrix.ndim == 2:
-                precision_matrix = precision_matrix[jnp.newaxis, ...]
-            lower_tri_precision = jax.vmap(jnp.linalg.cholesky)(precision_matrix)
-
-        if covariance_matrix is None and precision_matrix is None:
-            b_2, n, d = mu.shape[-3:]
-            lower_tri_precision = jnp.expand_dims(jnp.eye(d), [0, 1])
-            lower_tri_precision = lower_tri_precision.repeat(n, axis=1).repeat(b_2, axis=0)
-
-        return mu, lower_tri_covariance, lower_tri_precision
-
     def run(
             self,
             x: chex.Array,
@@ -548,43 +489,68 @@ class MahalanobisDistance(DistanceMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            The input data of shape = (b_x, N, D).
+            The input data point of shape (d, ) if particle, or (n, d) if time series.
         mu: `chex.Array`, optional
-            The mean of the input data of shape = (b_mu, N, D). If not provided, mu = 0.
+            The mean data point of shape (d, ) if particle, or (n, d) if time series. If not provided, mu = 0.
         covariance_matrix: `chex.Array`, optional
-            The covariance matrix of the input data of shape = (b_cov, N, D, D). If not provided, covariance_matrix = 0.
+            The covariance matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
+            covariance_matrix = eye(d).
         precision_matrix: `chex.Array`, optional
-            The precision matrix of the input data of shape = (b_prec, N, D, D). If not provided, precision_matrix = 0.
+            The precision matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
+            precision_matrix = eye(d).
 
         Returns
         -------
         `chex.Array`:
-            The estimated Mahalanobis distance of shape (b_x, b_mu).
+            The estimated Mahalanobis distance of shape ().
         """
-        assert x.shape[-1] == mu.shape[-1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and mu = (b_y, n, d) but d doesn't match. "
-            f"Got x = {x.shape} and mu = {mu.shape}."
+        if mu is None:
+            mu = jnp.zeros_like(x)
+
+        assert x.ndim == mu.ndim and x.shape == mu.shape, print(
+            f"The data point and the mean need to be of the same shape. Got x={x.shape} and y={y.shape}."
         )
-        assert x.shape[1] == mu.shape[1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and mu = (b_y, n, d) but n doesn't match. "
-            f"Got x = {x.shape} and mu = {mu.shape}.")
-        x = jnp.expand_dims(x, axis=1)
+        assert x.ndim <= 2 and mu.ndim <= 2, print(
+            f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
+            f"Got x = {x.shape} and y = {mu.shape}."
+        )
 
-        mu, lower_tri_covariance, lower_tri_precision = self.init_stats(x, mu, covariance_matrix, precision_matrix)
+        if x.ndim == 1:
+            x = jnp.expand_dims(x, axis=0)
+            mu = jnp.expand_dims(mu, axis=0)
 
-        x_centered = x - mu
+        lower_tri_covariance = None
+        if covariance_matrix is not None:
+            assert x.ndim == covariance_matrix.ndim-1 and x.shape == covariance_matrix.shape[:-1], print(
+                f"The data point and the covariance need to be of the same shape. "
+                f"Got x={x.shape} and y={covariance_matrix.shape}."
+            )
+            if covariance_matrix.ndim == 2:
+                covariance_matrix = covariance_matrix[jnp.newaxis, ...]
+            lower_tri_covariance = jax.vmap(jnp.linalg.cholesky)(covariance_matrix)
+
+        lower_tri_precision = None
+        if precision_matrix is not None:
+            assert x.ndim == precision_matrix.ndim-1 and x.shape == precision_matrix.shape[:-1], print(
+                f"The data point and the covariance need to be of the same shape. "
+                f"Got x={x.shape} and y={precision_matrix.shape}."
+            )
+            if precision_matrix.ndim == 2:
+                precision_matrix = precision_matrix[jnp.newaxis, ...]
+            lower_tri_precision = jax.vmap(jnp.linalg.cholesky)(precision_matrix)
+
+        if covariance_matrix is None and precision_matrix is None:
+            n, d = mu.shape
+            lower_tri_precision = jnp.expand_dims(jnp.eye(d), 0).repeat(n, axis=0)
+
         if lower_tri_covariance is not None:
-            lower_tri = lower_tri_covariance
-            _solve_fn = jax.vmap(jax.vmap(jnp.linalg.solve))
-            x_transformed = jax.vmap(_solve_fn, in_axes=[None, 0])(lower_tri, x_centered)
+            x_transformed = jax.vmap(jnp.linalg.solve)(lower_tri_covariance, x - mu)  # (n, d)
         elif lower_tri_precision is not None:
-            lower_tri = lower_tri_precision
-            x_transformed = jnp.einsum("...mn, ...n->...m", lower_tri, x_centered)
+            x_transformed = jnp.einsum("...mn, ...n->...m", lower_tri_precision, x - mu)  # (n, d)
         else:
-            raise ValueError("Neither covariance nor precision marices were given.")
+            raise ValueError("Neither covariance nor precision matrices were given.")
 
-        distance = jnp.linalg.norm(x_transformed, axis=-1)
-
+        distance = jnp.linalg.norm(x_transformed, axis=-1)  # (n, )
         if self.mean:
             return jnp.mean(distance, axis=-1)
         elif self.median:
@@ -598,10 +564,9 @@ class MahalanobisDistance(DistanceMeasures):
 @struct.dataclass
 class SquaredMahalanobisDistance(MahalanobisDistance):
     """
-    Similarity measure between time series data using the squared Mahalanobis distance between the individual pairs of
-    points. This implies that the series must be of equal length. The distance is calculated between a time
-    series data of shape (b_x, n, d) and a sequence of multivariate Normal distributions with mean of shape
-    (b_mu, n, d) and covariance of shape (b_cov, n, d, d). The result is of shape (b_x, b_mu).
+    Similarity measure between a data point and a multivariate Normal using the squared Mahalanobis distance.
+    If data point corresponds to a time series, the distance is calculated between the individual pairs.
+    This implies that the series must be of equal length.
 
     Parameters
     ----------
@@ -630,44 +595,69 @@ class SquaredMahalanobisDistance(MahalanobisDistance):
 
         Parameters
         ----------
-        x: `chex.Array`
-            The input data of shape = (b_x, N, D).
+       x: `chex.Array`
+            The input data point of shape (d, ) if particle, or (n, d) if time series.
         mu: `chex.Array`, optional
-            The mean of the input data of shape = (b_mu, N, D). If not provided, mu = 0.
+            The mean data point of shape (d, ) if particle, or (n, d) if time series. If not provided, mu = 0.
         covariance_matrix: `chex.Array`, optional
-            The covariance matrix of the input data of shape = (b_cov, N, D, D). If not provided, covariance_matrix = 0.
+            The covariance matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
+            covariance_matrix = eye(d).
         precision_matrix: `chex.Array`, optional
-            The precision matrix of the input data of shape = (b_prec, N, D, D). If not provided, precision_matrix = 0.
+            The precision matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
+            precision_matrix = eye(d).
 
         Returns
         -------
         `chex.Array`:
-            The estimated Mahalanobis distance of shape (b_x, b_mu).
+            The estimated squared Mahalanobis distance of shape ().
         """
-        assert x.shape[-1] == mu.shape[-1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and mu = (b_y, n, d) but d doesn't match. "
-            f"Got x = {x.shape} and mu = {mu.shape}."
+        if mu is None:
+            mu = jnp.zeros_like(x)
+
+        assert x.ndim == mu.ndim and x.shape == mu.shape, print(
+            f"The data point and the mean need to be of the same shape. Got x={x.shape} and y={y.shape}."
         )
-        assert x.shape[1] == mu.shape[1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and mu = (b_y, n, d) but n doesn't match. "
-            f"Got x = {x.shape} and mu = {mu.shape}.")
-        x = jnp.expand_dims(x, axis=1)
+        assert x.ndim <= 2 and mu.ndim <= 2, print(
+            f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
+            f"Got x = {x.shape} and y = {mu.shape}."
+        )
 
-        mu, lower_tri_covariance, lower_tri_precision = self.init_stats(x, mu, covariance_matrix, precision_matrix)
+        if x.ndim == 1:
+            x = jnp.expand_dims(x, axis=0)
+            mu = jnp.expand_dims(mu, axis=0)
 
-        x_centered = x - mu
+        lower_tri_covariance = None
+        if covariance_matrix is not None:
+            assert x.ndim == covariance_matrix.ndim-1 and x.shape == covariance_matrix.shape[:-1], print(
+                f"The data point and the covariance need to be of the same shape. "
+                f"Got x={x.shape} and y={covariance_matrix.shape}."
+            )
+            if covariance_matrix.ndim == 2:
+                covariance_matrix = covariance_matrix[jnp.newaxis, ...]
+            lower_tri_covariance = jax.vmap(jnp.linalg.cholesky)(covariance_matrix)
+
+        lower_tri_precision = None
+        if precision_matrix is not None:
+            assert x.ndim == precision_matrix.ndim-1 and x.shape == precision_matrix.shape[:-1], print(
+                f"The data point and the covariance need to be of the same shape. "
+                f"Got x={x.shape} and y={precision_matrix.shape}."
+            )
+            if precision_matrix.ndim == 2:
+                precision_matrix = precision_matrix[jnp.newaxis, ...]
+            lower_tri_precision = jax.vmap(jnp.linalg.cholesky)(precision_matrix)
+
+        if covariance_matrix is None and precision_matrix is None:
+            n, d = mu.shape
+            lower_tri_precision = jnp.expand_dims(jnp.eye(d), 0).repeat(n, axis=0)
 
         if lower_tri_covariance is not None:
-            lower_tri = lower_tri_covariance
-            _solve_fn = jax.vmap(jax.vmap(jnp.linalg.solve))
-            x_transformed = jax.vmap(_solve_fn, in_axes=[None, 0])(lower_tri, x_centered)
+            x_transformed = jax.vmap(jnp.linalg.solve)(lower_tri_covariance, x - mu)  # (n, d)
         elif lower_tri_precision is not None:
-            lower_tri = lower_tri_precision
-            x_transformed = jnp.einsum("...mn, ...n->...m", lower_tri, x_centered)
+            x_transformed = jnp.einsum("...mn, ...n->...m", lower_tri_precision, x - mu)  # (n, d)
         else:
-            raise ValueError("Neither covariance nor precision marices were given.")
+            raise ValueError("Neither covariance nor precision matrices were given.")
 
-        squared_distance = jnp.linalg.norm(x_transformed, axis=-1) ** 2
+        squared_distance = jnp.linalg.norm(x_transformed, axis=-1) ** 2  # (n, )
 
         if self.mean:
             return jnp.mean(squared_distance, axis=-1)
@@ -685,8 +675,7 @@ class DynamicTimeWarping(DistanceMeasures):
     Similarity measure between time series data using the Dynamic Time Warping (DTW) [1, 2]. The DTW is an algorithm
     used to measure the similarity between two sequences that may vary in time or speed. This implies that the series
     can be of different lengths. The resulting DTW distance is just a similarity measure and not a metric as it does
-    not satisfy the triangle inequality. The DTW distance is calculated between the two time series data of shape
-    (b_x, n_x, d) and (b_y, n_y, d). The result is of shape (b_x, b_y).
+    not satisfy the triangle inequality.
 
     The algorithm follows a dynamic programming approach to find the optimal alignment between the two sequences. We
     used the DTW implementation from [3].
@@ -757,32 +746,24 @@ class DynamicTimeWarping(DistanceMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            The input data of shape = (b_x, n_x, d).
+            The input data of shape = (n_x, d).
         y: `chex.Array`
-            The second input data of shape = (b_y, n_y, d).
+            The second input data of shape = (n_y, d).
 
         Returns
         -------
         chex.Array:
-            The model matrix for the dynamice time warping measure of shape (b_x, b_y, n_x + n_y - 1, n_y).
+            The model matrix for the dynamice time warping measure of shape (n_x + n_y - 1, n_y).
         """
+        x = jnp.expand_dims(x, axis=1)
+        y = jnp.expand_dims(y, axis=1)
+        distance_matrix = jax.vmap(jax.vmap(self.distance, in_axes=(0, None)), in_axes=(None, 0))(x, y)
 
-        assert x.shape[-1] == y.shape[-1], print(
-            f"The two inputs need to be of the shape x = (b_x, n_x, d) and y = (b_y, n_y, d) but d doesn't match. "
-            f"Got x = {x.shape} and y = {y.shape}.")
-
-        def _construct_model_matrix(_x: chex.Array, _y: chex.Array) -> chex.Array:
-            _x = jnp.expand_dims(_x, axis=1)
-            _y = jnp.expand_dims(_y, axis=1)
-            _distance_matrix = self.distance(x=_x, y=_y)
-
-            _h, _ = _distance_matrix.shape
-            _rows = []
-            for _row in range(_h):
-              _rows.append(jnp.pad(_distance_matrix[_row], (_row, _h-_row-1), constant_values=jnp.inf))
-            return jnp.stack(_rows, axis=1)
-
-        return jax.vmap(jax.vmap(_construct_model_matrix, in_axes=(None, 0)), in_axes=(0, None))(x, y)
+        h, _ = distance_matrix.shape
+        rows = []
+        for row in range(h):
+          rows.append(jnp.pad(distance_matrix[row], (row, h-row-1), constant_values=jnp.inf))
+        return jnp.stack(rows, axis=1)
 
     def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
@@ -791,15 +772,27 @@ class DynamicTimeWarping(DistanceMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            The input data of shape = (b_x, n_x, d).
+            The input data point of shape (d, ) if particle, or (n_x, d) if time series.
         y: `chex.Array`
-            The second input data of shape = (b_y, n_y, d).
+            The input data point of shape (d, ) if particle, or (n_y, d) if time series.
 
         Returns
         -------
         `chex.Array`:
-            The estimated Dynamic Time Warping distance of shape (b_x, b_y).
+            The estimated Dynamic Time Warping distance of shape ().
         """
+        assert x.shape[-1] == y.shape[-1], print(
+            f"The two inputs need to have the same dimensionality. Got x = {x.shape} and y = {y.shape}.")
+        assert x.ndim <= 2 and y.ndim <= 2, print(
+            f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
+            f"Got x = {x.shape} and y = {y.shape}."
+        )
+
+        if x.ndim == 1:
+            x = jnp.expand_dims(x, axis=0)
+        if y.ndim == 1:
+            y = jnp.expand_dims(y, axis=0)
+
         def _body_fn(carry: Sequence, anti_diagonal: chex.Array) -> Any:
             two_ago, one_ago = carry
 
@@ -813,16 +806,14 @@ class DynamicTimeWarping(DistanceMeasures):
 
             return (one_ago, next_row), next_row
 
-        def _run(model_matrix: chex.Array) -> chex.Array:
-            init = (
+        model_matrix = self.init_model_matrix(x, y)
+
+        init = (
             jnp.pad(model_matrix[0], (1, 0), constant_values=jnp.inf),
             jnp.pad(model_matrix[1] + model_matrix[0, 0], (1, 0), constant_values=jnp.inf)
-            )
-            carry, ys = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
-            return carry[1][-1]
-
-        model_matrix = self.init_model_matrix(x, y)
-        return jax.vmap(jax.vmap(_run))(model_matrix)
+        )
+        carry, ys = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
+        return carry[1][-1]
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -834,8 +825,7 @@ class DiscreteFrechetDistance(DistanceMeasures):
     Similarity measure between time series data using the discrete Frechet distance [1. 2]. It is the minimum length of
     a leash required for a dog and its owner to walk along their respective curves without backtracking. This implies
     that the series can be of different lengths. The discrete Frechet distance is a measure of similarity between two
-    curves. The discrete Frechet distance is calculated between the two time series data of shape (b_x, n_x, d) and
-    (b_y, n_y, d). The result is of shape (b_x, b_y).
+    curves.
 
     The algorithm follows a dynamic programming approach to find the optimal alignment between the two sequences. We
     followed the implementation of DTW from [3] and replaced the sum operation with the max operation resulting in
@@ -906,32 +896,25 @@ class DiscreteFrechetDistance(DistanceMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            The input data of shape = (b_x, n_x, d).
+            The input data of shape = (n_x, d).
         y: `chex.Array`
-            The second input data of shape = (b_y, n_y, d).
+            The second input data of shape = (n_y, d).
 
         Returns
         -------
         chex.Array:
-            The model matrix for the discrete Frechet distance measure of shape (b_x, b_y, n_x + n_y - 1, n_y).
+            The model matrix for the discrete Frechet distance measure of shape (n_x + n_y - 1, n_y).
         """
-        assert x.shape[-1] == y.shape[-1], print(
-            f"The two inputs need to be of the shape x = (b_x, n_x, d) and y = (b_y, n_y, d) but d doesn't match. "
-            f"Got x = {x.shape} and y = {y.shape}.")
+        x = jnp.expand_dims(x, axis=1)
+        y = jnp.expand_dims(y, axis=1)
+        distance_matrix = jax.vmap(jax.vmap(self.distance, in_axes=(0, None)), in_axes=(None, 0))(x, y)
 
-        def _construct_model_matrix(_x: chex.Array, _y: chex.Array) -> chex.Array:
-            _x = jnp.expand_dims(_x, axis=1)
-            _y = jnp.expand_dims(_y, axis=1)
-            _distance_matrix = self.distance(x=_x, y=_y)
+        h, _ = distance_matrix.shape
 
-            _h, _ = _distance_matrix.shape
-
-            _rows = []
-            for _row in range(_h):
-              _rows.append(jnp.pad(_distance_matrix[_row], (_row, _h-_row-1), constant_values=jnp.inf))
-            return jnp.stack(_rows, axis=1)
-
-        return jax.vmap(jax.vmap(_construct_model_matrix, in_axes=(None, 0)), in_axes=(0, None))(x, y)
+        rows = []
+        for row in range(h):
+          rows.append(jnp.pad(distance_matrix[row], (row, h-row-1), constant_values=jnp.inf))
+        return jnp.stack(rows, axis=1)
 
     def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
@@ -940,15 +923,27 @@ class DiscreteFrechetDistance(DistanceMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            The input data of shape = (b_x, n_x, d).
+            The input data point of shape (d, ) if particle, or (n_x, d) if time series.
         y: `chex.Array`
-            The second input data of shape = (b_y, n_y, d).
+            The input data point of shape (d, ) if particle, or (n_y, d) if time series.
 
         Returns
         -------
         `chex.Array`:
-            The estimated discrete Frechet distance of shape (b_x, b_y).
+            The estimated Dynamic Time Warping distance of shape ().
         """
+        assert x.shape[-1] == y.shape[-1], print(
+            f"The two inputs need to have the same dimensionality. Got x = {x.shape} and y = {y.shape}.")
+        assert x.ndim <= 2 and y.ndim <= 2, print(
+            f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
+            f"Got x = {x.shape} and y = {y.shape}."
+        )
+
+        if x.ndim == 1:
+            x = jnp.expand_dims(x, axis=0)
+        if y.ndim == 1:
+            y = jnp.expand_dims(y, axis=0)
+
         def _body_fn(carry: Sequence, anti_diagonal: chex.Array) -> Any:
             two_ago, one_ago = carry
 
@@ -962,20 +957,19 @@ class DiscreteFrechetDistance(DistanceMeasures):
 
             return (one_ago, next_row), next_row
 
-        def _run(model_matrix: chex.Array) -> chex.Array:
-            init = (
+        model_matrix = self.init_model_matrix(x, y)
+
+        init = (
             jnp.pad(model_matrix[0], (1, 0), constant_values=jnp.inf),
             jnp.pad(
-              jnp.maximum(model_matrix[1], model_matrix[0]),
-              (1, 0),
-              constant_values=jnp.inf
-              )
+                jnp.maximum(model_matrix[1], model_matrix[0]),
+                (1, 0),
+                constant_values=jnp.inf
             )
-            carry, ys = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
-            return carry[1][-1]
+        )
 
-        model_matrix = self.init_model_matrix(x, y)
-        return jax.vmap(jax.vmap(_run))(model_matrix)
+        carry, ys = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
+        return carry[1][-1]
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -1057,24 +1051,21 @@ class BaseCost(CostFn):
         total_cost = 0
         spatio_weights, temporal_weights = self.weights
         spatio_dist, temporal_dist = self.distances
-        x, y = x[jnp.newaxis, jnp.newaxis, ...], y[jnp.newaxis, jnp.newaxis, ...]
 
         # Spatial coordinate related cost
-        total_cost += spatio_weights * spatio_dist(x[..., :-1], y[..., :-1]).squeeze()
+        total_cost += spatio_weights * spatio_dist(x[:-1], y[:-1]).squeeze()
 
         # Temporal coordinate related cost
-        total_cost += temporal_weights * temporal_dist(x[..., -1:], y[..., -1:]).squeeze()
+        total_cost += temporal_weights * temporal_dist(x[-1:], y[-1:]).squeeze()
         return total_cost
 
 
 @struct.dataclass
 class SinkhornDistance(DistanceMeasures):
     """
-    Similarity measure between time series data using the Sinkhorn distance measure [1, 2]. The Sinkhorn distance is a
+    Similarity measure between data points using the Sinkhorn distance measure [1, 2]. The Sinkhorn distance is a
     regularized optimal transport distance that is a measure of similarity between two probability distributions. Here,
-    we consider each point in the time series as a weighted particle. Thus, the time series represent a discrete
-    probability measure. The Sinkhorn distance is calculated between the two time series data of shape (b_x, n_x, d) and
-    (b_y, n_y, d). The result is of shape (b_x, b_y).
+    we consider each point as a weighted particle.
 
     The algorithm follows a linear programming approach to find the optimal transport plan between the two sequences.
     We used the implementation of the Sinkhorn distance from [3].
@@ -1174,34 +1165,27 @@ class SinkhornDistance(DistanceMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            The input data of shape = (b_x, n_x, d).
+            The input data of shape = (n_x, d).
         y: `chex.Array`
-            The second input data of shape = (b_y, n_y, d).
+            The second input data of shape = (n_y, d).
 
         Returns
         -------
         `Any`
             The geometry of the Sinkhorn distance measure.
         """
-        assert x.shape[-1] == y.shape[-1], print(
-            f"The two inputs need to be of the shape x = (b_x, n, d) and y = (b_y, n, d) but d doesn't match. "
-            f"Got x = { x.shape} and y = {y.shape}.")
+        # Add time to given arrays based on a linear interpolation
+        n_x, _ = x.shape
+        x_extended = jnp.concatenate((x, jnp.linspace(0, 1, n_x)[:, jnp.newaxis]), axis=-1)
+        n_y, _ = y.shape
+        y_extended = jnp.concatenate((y, jnp.linspace(0, 1, n_y)[:, jnp.newaxis]), axis=-1)
 
-        def _construct_geom(_x: chex.Array, _y: chex.Array) -> Any:
-            # Add time to given arrays based on a linear interpolation
-            t_x, _ = _x.shape
-            _x = jnp.concatenate((_x, jnp.linspace(0, 1, t_x)[:, jnp.newaxis]), axis=-1)
-            t_y, _ = _y.shape
-            _y = jnp.concatenate((_y, jnp.linspace(0, 1, t_y)[:, jnp.newaxis]), axis=-1)
-
-            # Generat and return a geometry for a Linear OT problem
-            if self.epsilon is not None:
-                geometry = pointcloud.PointCloud(_x, _y, cost_fn=self.cost_fn, epsilon=self.epsilon)
-            else:
-                geometry = pointcloud.PointCloud(_x, _y, cost_fn=self.cost_fn)
-            return geometry
-
-        return jax.vmap(jax.vmap(_construct_geom, in_axes=(None, 0)), in_axes=(0, None))(x, y)
+        # Generate and return a geometry for a Linear OT problem
+        if self.epsilon is not None:
+            geometry = pointcloud.PointCloud(x_extended, y_extended, cost_fn=self.cost_fn, epsilon=self.epsilon)
+        else:
+            geometry = pointcloud.PointCloud(x_extended, y_extended, cost_fn=self.cost_fn)
+        return geometry
 
     def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
@@ -1210,21 +1194,30 @@ class SinkhornDistance(DistanceMeasures):
         Parameters
         ----------
         x: `chex.Array`
-            The input data of shape = (b_x, n_x, d).
+            The input data point of shape (d, ) if particle, or (n_x, d) if time series.
         y: `chex.Array`
-            The second input data of shape = (b_y, n_y, d).
+            The input data point of shape (d, ) if particle, or (n_y, d) if time series.
 
         Returns
         -------
         `chex.Array`
-            The estimated Sinkhorn distance of shape (b_x, b_y).
+            The estimated Sinkhorn distance of shape ().
         """
-        def _run(geometry: Any) -> chex.Array:
-            ot_problem = linear_problem.LinearProblem(geometry)
-            solution = self.solver(ot_problem)
-            if self.return_regularized_cost:
-                return solution.reg_ot_cost
-            return jnp.sum(solution.matrix * solution.geom.cost_matrix)
+        assert x.shape[-1] == y.shape[-1], print(
+            f"The two inputs need to have the same dimensionality. Got x = { x.shape} and y = {y.shape}.")
+        assert x.ndim <= 2 and y.ndim <= 2, print(
+            f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
+            f"Got x = {x.shape} and y = {y.shape}."
+        )
+
+        if x.ndim == 1:
+            x = jnp.expand_dims(x, axis=0)
+        if y.ndim == 1:
+            y = jnp.expand_dims(y, axis=0)
 
         geometry = self.init_geometry(x, y)
-        return jax.vmap(jax.vmap(_run))(geometry)
+        ot_problem = linear_problem.LinearProblem(geometry)
+        solution = self.solver(ot_problem)
+        if self.return_regularized_cost:
+            return solution.reg_ot_cost
+        return jnp.sum(solution.matrix * solution.geom.cost_matrix)
