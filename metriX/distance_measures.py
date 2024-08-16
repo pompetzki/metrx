@@ -48,7 +48,7 @@ class DistanceMeasures(ABC):
         cls._registry[cls.__name__] = cls
 
     @classmethod
-    def create_instance(cls, name: Optional[str] = None, *args: Sequence, **kwargs: Dict) -> "DistanceMeasures":
+    def create_instance(cls, name: Optional[str] = None, *args: Any, **kwargs: Any) -> "DistanceMeasures":
         """
         Create an instance of the distance measure.
 
@@ -56,9 +56,9 @@ class DistanceMeasures(ABC):
         ----------
         name: `str`, optional, default = None.
             The name of the distance measure to create.
-        args: `Sequence`
+        args: `Any`
             The arguments to pass to the constructor of the distance measure.
-        kwargs: `Dict`
+        kwargs: `Any`
             The keyword arguments to pass to the constructor of the distance measure.
 
         Returns
@@ -91,15 +91,15 @@ class DistanceMeasures(ABC):
         return self.run(*args, **kwargs)
 
     @abstractmethod
-    def run(self, *args, **kwargs) -> chex.Array:
+    def run(self, *args: Any, **kwargs: Any) -> chex.Array:
         """
         Estimate the distance measure.
 
         Parameters
         ----------
-        args: `Sequence`
+        args: `Any`
             The arguments to pass to the method.
-        kwargs: `Dict`
+        kwargs: `Any`
             The keyword arguments to pass to the method.
 
         Returns
@@ -174,15 +174,15 @@ class MinkowskiDistance(DistanceMeasures):
         return cls(p=p, mean=mean, median=median, total_sum=total_sum)
 
     @classmethod
-    def create(cls, *args: Sequence, **kwargs: Dict) -> "MinkowskiDistance":
+    def create(cls, *args: Any, **kwargs: Any) -> "MinkowskiDistance":
         """
         Create an instance of the Minkowski distance measure.
 
         Parameters
         ----------
-        args: `Sequence`
+        args: `Any`
             The arguments to pass to the constructor.
-        kwargs: `Dict`
+        kwargs: `Any`
             The keyword arguments to pass to the constructor.
 
         Returns
@@ -284,15 +284,15 @@ class EuclideanDistance(DistanceMeasures):
         return cls(mean=mean, median=median, total_sum=total_sum)
 
     @classmethod
-    def create(cls, *args: Sequence, **kwargs: Dict) -> "EuclideanDistance":
+    def create(cls, *args: Any, **kwargs: Any) -> "EuclideanDistance":
         """
         Create an instance of the Euclidean distance measure.
 
         Parameters
         ----------
-        args: `Sequence`
+        args: `Any`
             The arguments to pass to the constructor.
-        kwargs: `Dict`
+        kwargs: `Any`
             The keyword arguments to pass to the constructor.
 
         Returns
@@ -458,15 +458,15 @@ class MahalanobisDistance(DistanceMeasures):
         return cls(mean=mean, median=median, total_sum=total_sum)
 
     @classmethod
-    def create(cls, *args: Sequence, **kwargs: Any) -> "MahalanobisDistance":
+    def create(cls, *args: Any, **kwargs: Any) -> "MahalanobisDistance":
         """
         Create an instance of the Mahalanobis distance measure.
 
         Parameters
         ----------
-        args: `Sequence`
+        args: `Any`
             The arguments to pass to the constructor.
-        kwargs: `Dict`
+        kwargs: `Any`
             The keyword arguments to pass to the constructor.
 
         Returns
@@ -721,15 +721,15 @@ class DynamicTimeWarping(DistanceMeasures):
         return cls(distance=distance)
 
     @classmethod
-    def create(cls, *args: Sequence, **kwargs: Dict) -> "DynamicTimeWarping":
+    def create(cls, *args: Any, **kwargs: Any) -> "DynamicTimeWarping":
         """
         Create an instance of the Dynamic Time Warping distance measure.
 
         Parameters
         ----------
-        args: `Sequence`
+        args: `Any`
             The arguments to pass to the constructor.
-        kwargs: `Dict`
+        kwargs: `Any`
             The keyword arguments to pass to the constructor.
 
         Returns
@@ -871,15 +871,15 @@ class DiscreteFrechetDistance(DistanceMeasures):
         return cls(distance=distance)
 
     @classmethod
-    def create(cls, *args: Sequence, **kwargs: Dict) -> "DiscreteFrechetDistance":
+    def create(cls, *args: Any, **kwargs: Any) -> "DiscreteFrechetDistance":
         """
         Create an instance of the discrete Frechet distance measure.
 
         Parameters
         ----------
-        args: `Sequence`
+        args: `Any`
             The arguments to pass to the constructor.
-        kwargs: `Dict`
+        kwargs: `Any`
             The keyword arguments to pass to the constructor.
 
         Returns
@@ -997,9 +997,16 @@ class BaseCost(CostFn):
     distances: Optional[Sequence[DistanceMeasures]] = None
 
     @classmethod
-    def construct(cls) -> "BaseCost":
+    def construct(cls, *args: Any, **kwargs: Any) -> "BaseCost":
         """
         Construct the base cost function for the Sinkhorn distance measure.
+
+        Parameters
+        ----------
+        args: `Any`
+            The arguments to pass to the constructor.
+        kwargs: `Any`
+            The keyword arguments to pass to the constructor.
 
         Returns
         -------
@@ -1014,15 +1021,15 @@ class BaseCost(CostFn):
         return cls(weights=weights, distances=distances)
 
     @classmethod
-    def create(cls, *args: Sequence, **kwargs: Dict) -> "BaseCost":
+    def create(cls, *args: Any, **kwargs: Any) -> "BaseCost":
         """
         Create an instance of the base cost function for the Sinkhorn distance measure.
 
         Parameters
         ----------
-        args: `Sequence`
+        args: `Any`
             The arguments to pass to the constructor.
-        kwargs:
+        kwargs: `Any`
             The keyword arguments to pass to the constructor.
 
         Returns
@@ -1140,15 +1147,15 @@ class SinkhornDistance(DistanceMeasures):
         )
 
     @classmethod
-    def create(cls, *args: Sequence, **kwargs: Dict) -> "SinkhornDistance":
+    def create(cls, *args: Any, **kwargs: Any) -> "SinkhornDistance":
         """
         Create an instance of the Sinkhorn distance measure.
 
         Parameters
         ----------
-        args: `Sequence`
+        args: `Any`
             The arguments to pass to the constructor.
-        kwargs: `Dict`
+        kwargs: `Any`
             The keyword arguments to pass to the constructor.
 
         Returns

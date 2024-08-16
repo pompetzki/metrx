@@ -47,7 +47,7 @@ class StatisticalMeasures(ABC):
         cls._registry[cls.__name__] = cls
 
     @classmethod
-    def create_instance(cls, name: Optional[str] = None, *args: Sequence, **kwargs: Dict) -> "StatisticalMeasures":
+    def create_instance(cls, name: Optional[str] = None, *args: Any, **kwargs: Any) -> "StatisticalMeasures":
         """
         Create an instance of the statistical measure using the name of the statistical measure.
 
@@ -55,10 +55,10 @@ class StatisticalMeasures(ABC):
         ----------
         name: `str`, default = None
             The name of the statistical measure.
-        args: `Sequence`
-            A sequence of arguments passed to the constructor of the statistical measure.
-        kwargs: `Dict`
-            A dictionary of keyword arguments passed to the constructor of the statistical measure.
+        args: `Any`
+            Arguments passed to the constructor of the statistical measure.
+        kwargs: `Any`
+            Keyword arguments passed to the constructor of the statistical measure.
 
         Returns
         -------
@@ -91,15 +91,15 @@ class StatisticalMeasures(ABC):
         return self.run(*args, **kwargs)
 
     @abstractmethod
-    def run(self, *args, **kwargs) -> chex.Array:
+    def run(self, *args: Any, **kwargs: Any) -> chex.Array:
         """
         Estimate the statistical measure.
 
         Parameters
         ----------
-        args: `Sequence`
+        args: `Any`
             The arguments to pass to the method.
-        kwargs: `Dict`
+        kwargs: `Any`
             The keyword arguments to pass to the method.
 
         Returns
@@ -181,16 +181,16 @@ class RelativeEntropy(StatisticalMeasures):
         return cls(reverse=reverse, reg=reg, mean=mean, median=median, total_sum=total_sum)
 
     @classmethod
-    def create(cls, *args: Sequence, **kwargs: Dict) -> "RelativeEntropy":
+    def create(cls, *args: Any, **kwargs: Any) -> "RelativeEntropy":
         """
         Create an instance of the relative entropy divergence measure.
 
         Parameters
         ----------
-        args: `Sequence`
-            A sequence of arguments passed to the constructor of the relative entropy divergence measure.
-        kwargs: `Dict`
-            A dictionary of keyword arguments passed to the constructor of the relative entropy divergence measure.
+        args: `Any`
+            Arguments passed to the constructor of the relative entropy divergence measure.
+        kwargs: `Any`
+            Keyword arguments passed to the constructor of the relative entropy divergence measure.
 
         Returns
         -------
@@ -321,16 +321,16 @@ class FrechetInceptionDistance(StatisticalMeasures):
         return cls(alpha=alpha, reg=reg, mean=mean, median=median, total_sum=total_sum)
 
     @classmethod
-    def create(cls, *args: Sequence, **kwargs: Dict) -> "FrechetInceptionDistance":
+    def create(cls, *args: Any, **kwargs: Any) -> "FrechetInceptionDistance":
         """
         Create an instance of the Frechet Inception Distance measure.
 
         Parameters
         ----------
-        args: `Sequence`
-            A sequence of arguments passed to the constructor of the Frechet Inception Distance measure.
-        kwargs: `Dict`
-            A dictionary of keyword arguments passed to the constructor of the Frechet Inception Distance measure.
+        args: `Any`
+            Arguments passed to the constructor of the Frechet Inception Distance measure.
+        kwargs: `Any`
+            Keyword arguments passed to the constructor of the Frechet Inception Distance measure.
 
         Returns
         -------
@@ -460,16 +460,16 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         return cls(distance=distance, bandwidths=bandwidths, unbiased=unbiased)
 
     @classmethod
-    def create(cls, *args: Sequence, **kwargs: Dict) -> "MaximumMeanDiscrepancy":
+    def create(cls, *args: Any, **kwargs: Any) -> "MaximumMeanDiscrepancy":
         """
         Create an instance of the Maximum Mean Discrepancy measure.
 
         Parameters
         ----------
-        args: `Sequence`
-            A sequence of arguments passed to the constructor of the Maximum Mean Discrepancy measure.
-        kwargs: `Dict`
-            A dictionary of keyword arguments passed to the constructor of the Maximum Mean Discrepancy measure.
+        args: `Any`
+            Arguments passed to the constructor of the Maximum Mean Discrepancy measure.
+        kwargs: `Any`
+            Keyword arguments passed to the constructor of the Maximum Mean Discrepancy measure.
 
         Returns
         -------
