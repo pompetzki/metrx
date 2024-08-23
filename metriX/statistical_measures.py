@@ -1,14 +1,19 @@
+from abc import ABC, abstractmethod
+from typing import Sequence, Optional, Any, Dict, Union
+
 import chex
 import distrax
 import jax
 import jax.numpy as jnp
-
-from abc import ABC, abstractmethod
 from flax import struct
-from typing import Sequence, Optional, Any, Dict
+from jax.numpy import ndarray
+from ott.geometry import pointcloud
+from ott.solvers.linear import sinkhorn
+from ott.problems.linear import linear_problem
+from ott.geometry.costs import CostFn
 
 from metriX.distance_measures import DistanceMeasures
-from metriX.distance_measures import SquaredEuclideanDistance
+from metriX.distance_measures import SquaredEuclideanDistance, EuclideanDistance
 from metriX.utils import fit_gaussian2data
 
 
@@ -79,9 +84,7 @@ class StatisticalMeasures(ABC):
 
     @classmethod
     @abstractmethod
-    def construct(
-        cls,
-    ) -> "StatisticalMeasures":
+    def construct(cls, *args, **kwargs) -> "StatisticalMeasures":
         """Create an Instance of the statistical distance measure"""
 
     @classmethod
@@ -540,3 +543,100 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
             c_yy = 1 / b_y
 
         return c_xx * jnp.sum(kxx) - c_xy * jnp.sum(kxy) + c_yy * jnp.sum(kyy)
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------- 1-Wasserstein distance ----------------------------------------------
+# --------------------------------------------------------------------------------------------------------------------
+
+
+@struct.dataclass
+class OTTCostWrapper(CostFn):
+    distance_measure: DistanceMeasures = struct.field(pytree_node=False)
+
+    @classmethod
+    def construct(cls, distance_measure: DistanceMeasures):
+        return cls(distance_measure)
+
+    def pairwise(self, x: jax.Array, y: jax.Array) -> float:
+        distance = self.distance_measure(x, y)
+        return distance.squeeze()
+
+
+@struct.dataclass
+class WassersteinDistance(StatisticalMeasures):
+    """
+    Approximation of the 1-Wasserstein distance using the Sinkhorn iterations.
+    Depending on the selected distance the two time series have to be of the same length (N_x = N_y), .e.g., the squared Euclidean distance. However,
+    using dynamic time warping as distance measure, the two time series can have different lengths (N_x != N_y).
+
+    Parameters
+    ----------
+    distance: `DistanceMeasures`, default = SquaredEuclideanDistance
+        A distance measure to compute the distance between the two time series data.
+    distance_kwargs: `Dict`, containing the configurations to intitialize the `DistanceMeasures`, if `DistanceMeasurs` is a str.
+    epsilon: `float`, default = None
+        The regularization parameter for the regularized optimal transport problem
+    return_regularized_cost: `bool`, optional, default = None.
+        If True, the regularized cost is returned. If False, the unregularized cost is returned.
+
+    Returns
+    -------
+    `WassersteinDistance`
+        An instance of the Wasserstein distance measure
+    """
+
+    cost_fn: OTTCostWrapper = struct.field(pytree_node=False)
+    epsilon: Optional[float] = struct.field(default=None, pytree_node=False)
+    return_regularized_cost: bool = struct.field(default=False, pytree_node=False)
+
+    @classmethod
+    def construct(
+        cls,
+        distance_measure: Union[DistanceMeasures, str] = "EuclideanDistance",
+        distance_kwargs: Dict = {},
+        epsilon: Optional[float] = None,
+        return_regularized_cost: bool = False,
+    ) -> StatisticalMeasures:
+
+        if isinstance(distance_measure, str):
+            distance_measure = DistanceMeasures.create_instance(
+                distance_measure, **distance_kwargs
+            )
+
+        # Build costfunction wrapper for the ott-jax library
+        cost_fn = OTTCostWrapper.construct(distance_measure)
+
+        return cls(cost_fn, epsilon, return_regularized_cost)
+
+    @property
+    def distance_measure(self):
+        return self.cost_fn.distance_measure
+
+    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
+        """
+        Run the 1-Wasserstein distance.
+
+        Parameters
+        ----------
+        x: `chex.Array`
+            Empirical data of shape (b_x, d) if particles are considered. If time series data is considered, the shape
+            is (b_x, n_x, d).
+        y: `chex.Array`
+            Empirical data of shape (b_y, d) if particles are considered. If time series data is considered, the shape
+            is (b_x, n_y, d).
+
+        Returns
+        -------
+        `chex.Array`
+            The Maximum Mean Discrepancy measure of shape ().
+        """
+        geom = pointcloud.PointCloud(x, y, cost_fn=self.cost_fn, epsilon=self.epsilon)
+        ot_prob = linear_problem.LinearProblem(geom)
+        solver = sinkhorn.Sinkhorn()
+        out = solver(ot_prob)
+
+        if self.return_regularized_cost:
+            return out.reg_ot_cost
+
+        return jnp.sum(out.matrix * out.geom.cost_matrix)

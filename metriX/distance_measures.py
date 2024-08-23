@@ -79,9 +79,7 @@ class DistanceMeasures(ABC):
 
     @classmethod
     @abstractmethod
-    def construct(
-        cls,
-    ) -> "DistanceMeasures":
+    def construct(cls, *args, **kwargs) -> "DistanceMeasures":
         """Create an Instance of the Distance Measure"""
 
     @classmethod
@@ -1139,16 +1137,14 @@ class SinkhornDistance(DistanceMeasures):
     solver: Optional[Any] = None
     cost_fn: Optional[CostFn] = struct.field(default=None, pytree_node=False)
     epsilon: Optional[float] = struct.field(default=None, pytree_node=False)
-    return_regularized_cost: Optional[bool] = struct.field(
-        default=None, pytree_node=False
-    )
+    return_regularized_cost: bool = struct.field(default=False, pytree_node=False)
 
     @classmethod
     def construct(
         cls,
         epsilon: Optional[float] = None,
         cost_fn: Optional[CostFn] = None,
-        return_regularized_cost: Optional[bool] = None,
+        return_regularized_cost: bool = False,
     ) -> "SinkhornDistance":
         """
         Construct the Sinkhorn distance measure.
@@ -1169,9 +1165,6 @@ class SinkhornDistance(DistanceMeasures):
         """
         if cost_fn is None:
             cost_fn = BaseCost.construct()
-
-        if return_regularized_cost is None:
-            return_regularized_cost = False
 
         return cls(
             solver=sinkhorn.Sinkhorn(),
@@ -1207,14 +1200,9 @@ class SinkhornDistance(DistanceMeasures):
         )
 
         # Generate and return a geometry for a Linear OT problem
-        if self.epsilon is not None:
-            geometry = pointcloud.PointCloud(
-                x_extended, y_extended, cost_fn=self.cost_fn, epsilon=self.epsilon
-            )
-        else:
-            geometry = pointcloud.PointCloud(
-                x_extended, y_extended, cost_fn=self.cost_fn
-            )
+        geometry = pointcloud.PointCloud(
+            x_extended, y_extended, cost_fn=self.cost_fn, epsilon=self.epsilon
+        )
         return geometry
 
     def run(self, x: chex.Array, y: chex.Array) -> chex.Array:

@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from typing import Sequence
 
 
-@functools.partial(jax.jit, static_argnames=['reg'])
+@functools.partial(jax.jit, static_argnames=["reg"])
 def fit_gaussian2data(x: chex.Array, reg: float = 1e-5) -> Sequence[chex.Array]:
     """
     Fit a Gaussian model to each time step n given the samples from x as array of shape (b, n, d).
@@ -31,9 +31,10 @@ def fit_gaussian2data(x: chex.Array, reg: float = 1e-5) -> Sequence[chex.Array]:
     mean = jnp.mean(x, axis=0, keepdims=True)
 
     x_centered = x - mean
-    covariance_matrix = jnp.einsum(
-      "...btn, ...btm->...tnm", x_centered, x_centered) / (b - 1 + 1e-5)
-    covariance_matrix = (covariance_matrix + reg * jnp.eye(d))
+    covariance_matrix = jnp.einsum("...btn, ...btm->...tnm", x_centered, x_centered) / (
+        b - 1 + 1e-5
+    )
+    covariance_matrix = covariance_matrix + reg * jnp.eye(d)
 
     tri_lower_matrix = jax.vmap(jnp.linalg.cholesky)(covariance_matrix)
 
