@@ -82,7 +82,7 @@ class DistanceMeasures(ABC):
     def construct(
         cls,
     ) -> "DistanceMeasures":
-        """"""
+        """Create an Instance of the Distance Measure"""
 
     @classmethod
     def create(cls, *args: Any, **kwargs: Any) -> "DistanceMeasures":
@@ -302,25 +302,6 @@ class EuclideanDistance(DistanceMeasures):
             total_sum = True
         return cls(mean=mean, median=median, total_sum=total_sum)
 
-    @classmethod
-    def create(cls, *args: Any, **kwargs: Any) -> "EuclideanDistance":
-        """
-        Create an instance of the Euclidean distance measure.
-
-        Parameters
-        ----------
-        args: `Any`
-            The arguments to pass to the constructor.
-        kwargs: `Any`
-            The keyword arguments to pass to the constructor.
-
-        Returns
-        -------
-        `EuclideanDistance`:
-            An instance of the Euclidean distance measure.
-        """
-        return cls.construct(*args, **kwargs)
-
     def run(self, x: chex.Array, y: Optional[chex.Array] = None) -> chex.Array:
         """
         Estimate the Euclidean distance measure.
@@ -428,7 +409,7 @@ class SquaredEuclideanDistance(EuclideanDistance):
 
 
 # --------------------------------------------------------------------------------------------------------------------
-# ----------------------------------------------- Cosine Distance -----------------------------------------------
+# ------------------------------------------------- Cosine Distance --------------------------------------------------
 # --------------------------------------------------------------------------------------------------------------------
 @struct.dataclass
 class CosineDistance(DistanceMeasures):
@@ -520,25 +501,6 @@ class MahalanobisDistance(DistanceMeasures):
         if not mean and not median and not total_sum:
             total_sum = True
         return cls(mean=mean, median=median, total_sum=total_sum)
-
-    @classmethod
-    def create(cls, *args: Any, **kwargs: Any) -> "MahalanobisDistance":
-        """
-        Create an instance of the Mahalanobis distance measure.
-
-        Parameters
-        ----------
-        args: `Any`
-            The arguments to pass to the constructor.
-        kwargs: `Any`
-            The keyword arguments to pass to the constructor.
-
-        Returns
-        -------
-        `MahalanobisDistance`:
-            An instance of the Mahalanobis distance measure.
-        """
-        return cls.construct(*args, **kwargs)
 
     def run(
         self,
@@ -807,25 +769,6 @@ class DynamicTimeWarping(DistanceMeasures):
             distance = EuclideanDistance.construct()
         return cls(distance=distance)
 
-    @classmethod
-    def create(cls, *args: Any, **kwargs: Any) -> "DynamicTimeWarping":
-        """
-        Create an instance of the Dynamic Time Warping distance measure.
-
-        Parameters
-        ----------
-        args: `Any`
-            The arguments to pass to the constructor.
-        kwargs: `Any`
-            The keyword arguments to pass to the constructor.
-
-        Returns
-        -------
-        `DynamicTimeWarping`
-            An instance of the Dynamic Time Warping distance measure.
-        """
-        return cls.construct(*args, **kwargs)
-
     def init_model_matrix(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
         Initialize the state for the Dynamic Time Warping distance measure.
@@ -968,25 +911,6 @@ class DiscreteFrechetDistance(DistanceMeasures):
         if distance is None:
             distance = EuclideanDistance.construct()
         return cls(distance=distance)
-
-    @classmethod
-    def create(cls, *args: Any, **kwargs: Any) -> "DiscreteFrechetDistance":
-        """
-        Create an instance of the discrete Frechet distance measure.
-
-        Parameters
-        ----------
-        args: `Any`
-            The arguments to pass to the constructor.
-        kwargs: `Any`
-            The keyword arguments to pass to the constructor.
-
-        Returns
-        -------
-        `DiscreteFrechetDistance`
-            An instance of the discrete Frechet distance measure.
-        """
-        return cls.construct(*args, **kwargs)
 
     def init_model_matrix(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
@@ -1255,25 +1179,6 @@ class SinkhornDistance(DistanceMeasures):
             cost_fn=cost_fn,
             return_regularized_cost=return_regularized_cost,
         )
-
-    @classmethod
-    def create(cls, *args: Any, **kwargs: Any) -> "SinkhornDistance":
-        """
-        Create an instance of the Sinkhorn distance measure.
-
-        Parameters
-        ----------
-        args: `Any`
-            The arguments to pass to the constructor.
-        kwargs: `Any`
-            The keyword arguments to pass to the constructor.
-
-        Returns
-        -------
-        `SinkhornDistance`
-            An instance of the Sinkhorn distance measure.
-        """
-        return cls.construct(*args, **kwargs)
 
     def init_geometry(self, x: chex.Array, y: chex.Array) -> Any:
         """

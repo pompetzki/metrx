@@ -77,6 +77,32 @@ class StatisticalMeasures(ABC):
                 f"Unknown class name: {name}. Registered measures: {registered}"
             )
 
+    @classmethod
+    @abstractmethod
+    def construct(
+        cls,
+    ) -> "StatisticalMeasures":
+        """Create an Instance of the statistical distance measure"""
+
+    @classmethod
+    def create(cls, *args: Any, **kwargs: Any) -> "RelativeEntropy":
+        """
+        Create an instance of the the statistical distance measure.
+
+        Parameters
+        ----------
+        args: `Any`
+            Arguments passed to the constructor of the statistical distance measure.
+        kwargs: `Any`
+            Keyword arguments passed to the constructor of the statistical distance measure.
+
+        Returns
+        -------
+        `Statistical distance`
+            An instance of the relative entropy divergence measure.
+        """
+        return cls.construct(*args, **kwargs)
+
     def __call__(self, *args: Any, **kwargs: Any) -> chex.Array:
         """
         Call the statistical measure.
@@ -187,25 +213,6 @@ class RelativeEntropy(StatisticalMeasures):
         return cls(
             reverse=reverse, reg=reg, mean=mean, median=median, total_sum=total_sum
         )
-
-    @classmethod
-    def create(cls, *args: Any, **kwargs: Any) -> "RelativeEntropy":
-        """
-        Create an instance of the relative entropy divergence measure.
-
-        Parameters
-        ----------
-        args: `Any`
-            Arguments passed to the constructor of the relative entropy divergence measure.
-        kwargs: `Any`
-            Keyword arguments passed to the constructor of the relative entropy divergence measure.
-
-        Returns
-        -------
-        `RelativeEntropy`
-            An instance of the relative entropy divergence measure.
-        """
-        return cls.construct(*args, **kwargs)
 
     def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
@@ -325,25 +332,6 @@ class FrechetInceptionDistance(StatisticalMeasures):
             total_sum = True
         return cls(alpha=alpha, reg=reg, mean=mean, median=median, total_sum=total_sum)
 
-    @classmethod
-    def create(cls, *args: Any, **kwargs: Any) -> "FrechetInceptionDistance":
-        """
-        Create an instance of the Frechet Inception Distance measure.
-
-        Parameters
-        ----------
-        args: `Any`
-            Arguments passed to the constructor of the Frechet Inception Distance measure.
-        kwargs: `Any`
-            Keyword arguments passed to the constructor of the Frechet Inception Distance measure.
-
-        Returns
-        -------
-        `FrechetInceptionDistance`
-            An instance of the Frechet Inception Distance measure.
-        """
-        return cls.construct(*args, **kwargs)
-
     def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
         Run the total Frechet Inception Distance measure.
@@ -429,16 +417,16 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         An instance of the Maximum Mean Discrepancy measure
     """
 
-    distance: Optional[DistanceMeasures] = struct.field(default=None, pytree_node=False)
-    bandwidths: Optional[chex.Array] = struct.field(default=None, pytree_node=False)
-    unbiased: Optional[bool] = struct.field(default=None, pytree_node=False)
+    distance: DistanceMeasures = struct.field(pytree_node=False)
+    bandwidths: chex.Array = struct.field(pytree_node=False)
+    unbiased: Optional[bool] = struct.field(default=True, pytree_node=False)
 
     @classmethod
     def construct(
         cls,
         distance: Optional[DistanceMeasures] = None,
-        bandwidths: Optional[Sequence[float]] = None,
-        unbiased: Optional[bool] = None,
+        bandwidths: Optional[Union[Sequence[float], chex.Array]] = None,
+        unbiased: bool = True,
     ) -> "MaximumMeanDiscrepancy":
         """
         Construct an instance of the Maximum Mean Discrepancy measure.
@@ -465,30 +453,10 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
             bandwidths = jnp.array(
                 [1.0, 10.0, 20.0, 40.0, 80.0, 100.0, 130.0, 200.0, 400.0, 800.0, 1000.0]
             )
-
-        if unbiased is None:
-            unbiased = True
+        elif isinstance(bandwidths, Sequence):
+            bandwidths = jnp.array(bandwidths)
 
         return cls(distance=distance, bandwidths=bandwidths, unbiased=unbiased)
-
-    @classmethod
-    def create(cls, *args: Any, **kwargs: Any) -> "MaximumMeanDiscrepancy":
-        """
-        Create an instance of the Maximum Mean Discrepancy measure.
-
-        Parameters
-        ----------
-        args: `Any`
-            Arguments passed to the constructor of the Maximum Mean Discrepancy measure.
-        kwargs: `Any`
-            Keyword arguments passed to the constructor of the Maximum Mean Discrepancy measure.
-
-        Returns
-        -------
-        `MaximumMeanDiscrepancy`
-            An instance of the Maximum Mean Discrepancy measure
-        """
-        return cls.construct(*args, **kwargs)
 
     def _mmd_kernel(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
