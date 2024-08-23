@@ -29,6 +29,7 @@ class DistanceMeasures(ABC):
     `DistanceMeasures`
         An instance of the base class for all distance measures.
     """
+
     _registry = {}
 
     def __init_subclass__(cls, **kwargs: Dict) -> None:
@@ -48,7 +49,9 @@ class DistanceMeasures(ABC):
         cls._registry[cls.__name__] = cls
 
     @classmethod
-    def create_instance(cls, name: Optional[str] = None, *args: Any, **kwargs: Any) -> "DistanceMeasures":
+    def create_instance(
+        cls, name: Optional[str] = None, *args: Any, **kwargs: Any
+    ) -> "DistanceMeasures":
         """
         Create an instance of the distance measure.
 
@@ -70,7 +73,35 @@ class DistanceMeasures(ABC):
             return cls._registry[name].create(*args, **kwargs)
         else:
             registered = ", ".join([key for key in cls._registry.keys()])
-            raise ValueError(f"Unknown class name: {name}. Registered measures: {registered}")
+            raise ValueError(
+                f"Unknown class name: {name}. Registered measures: {registered}"
+            )
+
+    @classmethod
+    @abstractmethod
+    def construct(
+        cls,
+    ) -> "DistanceMeasures":
+        """"""
+
+    @classmethod
+    def create(cls, *args: Any, **kwargs: Any) -> "DistanceMeasures":
+        """
+        Create an instance of the Minkowski distance measure.
+
+        Parameters
+        ----------
+        args: `Any`
+            The arguments to pass to the constructor.
+        kwargs: `Any`
+            The keyword arguments to pass to the constructor.
+
+        Returns
+        -------
+        `DistanceMeasures`:
+            An instance of the distance measure.
+        """
+        return cls.construct(*args, **kwargs)
 
     def __call__(self, *args: Any, **kwargs: Any) -> chex.Array:
         """
@@ -137,6 +168,7 @@ class MinkowskiDistance(DistanceMeasures):
     `MinkowskiDistance`
         An instance of the Minkowski distance measure.
     """
+
     p: Optional[float] = struct.field(default=None, pytree_node=False)
     mean: Optional[bool] = struct.field(default=None, pytree_node=False)
     median: Optional[bool] = struct.field(default=None, pytree_node=False)
@@ -144,11 +176,12 @@ class MinkowskiDistance(DistanceMeasures):
 
     @classmethod
     def construct(
-            cls,
-            p: float = 2,
-            mean: bool = False,
-            median: bool = False,
-            total_sum: bool = False) -> "MinkowskiDistance":
+        cls,
+        p: float = 2,
+        mean: bool = False,
+        median: bool = False,
+        total_sum: bool = False,
+    ) -> "MinkowskiDistance":
         """
         Construct the Minkowski distance measure.
 
@@ -168,29 +201,12 @@ class MinkowskiDistance(DistanceMeasures):
         `MinkowskiDistance`
             An instance of the Minkowski distance measure.
         """
-        assert p >= 1, "The order p of the Minkowski distance should be in [0, inf]. Got {p}"
+        assert (
+            p >= 1
+        ), "The order p of the Minkowski distance should be in [0, inf]. Got {p}"
         if not mean and not median and not total_sum:
             total_sum = True
         return cls(p=p, mean=mean, median=median, total_sum=total_sum)
-
-    @classmethod
-    def create(cls, *args: Any, **kwargs: Any) -> "MinkowskiDistance":
-        """
-        Create an instance of the Minkowski distance measure.
-
-        Parameters
-        ----------
-        args: `Any`
-            The arguments to pass to the constructor.
-        kwargs: `Any`
-            The keyword arguments to pass to the constructor.
-
-        Returns
-        -------
-        `MinkowskiDistance`:
-            An instance of the Minkowski distance measure.
-        """
-        return cls.construct(*args, **kwargs)
 
     def run(self, x: chex.Array, y: Optional[chex.Array] = None) -> chex.Array:
         """
@@ -211,10 +227,10 @@ class MinkowskiDistance(DistanceMeasures):
         if y is None:
             y = jnp.zeros_like(x)
 
-        assert x.ndim == y.ndim and x.shape == y.shape, print(
-            f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
-        )
-        assert x.ndim <= 2 and y.ndim <= 2, print(
+        assert (
+            x.ndim == y.ndim and x.shape == y.shape
+        ), f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
+        assert x.ndim <= 2 and y.ndim <= 2, (
             f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
             f"Got x = {x.shape} and y = {y.shape}."
         )
@@ -256,12 +272,15 @@ class EuclideanDistance(DistanceMeasures):
     `EuclideanDistance`
         An instance of the Euclidean distance measure.
     """
+
     mean: Optional[bool] = struct.field(default=None, pytree_node=False)
     median: Optional[bool] = struct.field(default=None, pytree_node=False)
     total_sum: Optional[bool] = struct.field(default=None, pytree_node=False)
 
     @classmethod
-    def construct(cls, mean: bool = False, median: bool = False, total_sum: bool = False) -> "EuclideanDistance":
+    def construct(
+        cls, mean: bool = False, median: bool = False, total_sum: bool = False
+    ) -> "EuclideanDistance":
         """
         Construct the Euclidean distance measure.
 
@@ -321,10 +340,10 @@ class EuclideanDistance(DistanceMeasures):
         if y is None:
             y = jnp.zeros_like(x)
 
-        assert x.ndim == y.ndim and x.shape == y.shape, print(
-            f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
-        )
-        assert x.ndim <= 2 and y.ndim <= 2, print(
+        assert (
+            x.ndim == y.ndim and x.shape == y.shape
+        ), f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
+        assert x.ndim <= 2 and y.ndim <= 2, (
             f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
             f"Got x = {x.shape} and y = {y.shape}."
         )
@@ -366,6 +385,7 @@ class SquaredEuclideanDistance(EuclideanDistance):
     `SquaredEuclideanDistance`
         An instance of the squared Euclidean distance measure.
     """
+
     def run(self, x: chex.Array, y: Optional[chex.Array] = None) -> chex.Array:
         """
         Estimate the squared Euclidean distance measure.
@@ -386,11 +406,12 @@ class SquaredEuclideanDistance(EuclideanDistance):
         if y is None:
             y = jnp.zeros_like(x)
 
-        assert x.ndim == y.ndim and x.shape == y.shape, print(
-            f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
-        )
-        assert x.ndim <= 2 and y.ndim <= 2, print(
-            f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
+        assert (
+            x.ndim == y.ndim and x.shape == y.shape
+        ), f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
+
+        assert x.ndim <= 2 and y.ndim <= 2, (
+            f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series."
             f"Got x = {x.shape} and y = {y.shape}."
         )
 
@@ -404,6 +425,46 @@ class SquaredEuclideanDistance(EuclideanDistance):
         elif self.median:
             return jnp.median(squared_distance, axis=-1)
         return jnp.sum(squared_distance, axis=-1)
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------- Cosine Distance -----------------------------------------------
+# --------------------------------------------------------------------------------------------------------------------
+@struct.dataclass
+class CosineDistance(DistanceMeasures):
+    @classmethod
+    def construct(cls) -> DistanceMeasures:
+        return cls()
+
+    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
+        """
+        Estimate the Cosine distance measure d = 1 - 'cosine similarity'.
+        Note that the cosine distance is only a quasi-metric.
+
+        Parameters
+        ----------
+        x: `chex.Array`
+            The input data point of shape (d, ). Time series data is not supported at this point
+        y: `chex.Array`, optional
+            The second input data of shape (d, ).
+
+        Returns
+        -------
+        `chex.Array`:
+            The estimated cosine distance of shape ().
+
+        """
+
+        assert (
+            x.ndim == y.ndim <= 1
+        ), f"The cosine distance only supports data of shape (d,), but received {x.shape}"
+        assert (
+            x.shape == y.shape
+        ), f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
+
+        dot_product = jnp.dot(x, y)
+        cosine_similarity = dot_product / (jnp.linalg.norm(x) * jnp.linalg.norm(y))
+        return 1 - cosine_similarity
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -430,12 +491,15 @@ class MahalanobisDistance(DistanceMeasures):
     `MahalanobisDistance`
         An instance of the Mahalanobis distance measure.
     """
+
     mean: Optional[bool] = struct.field(default=None, pytree_node=False)
     median: Optional[bool] = struct.field(default=None, pytree_node=False)
     total_sum: Optional[bool] = struct.field(default=None, pytree_node=False)
 
     @classmethod
-    def construct(cls, mean: bool = False, median: bool = False, total_sum: bool = False) -> "MahalanobisDistance":
+    def construct(
+        cls, mean: bool = False, median: bool = False, total_sum: bool = False
+    ) -> "MahalanobisDistance":
         """
         Construct the Mahalanobis distance measure.
 
@@ -477,11 +541,11 @@ class MahalanobisDistance(DistanceMeasures):
         return cls.construct(*args, **kwargs)
 
     def run(
-            self,
-            x: chex.Array,
-            mu: Optional[chex.Array] = None,
-            covariance_matrix: Optional[chex.Array] = None,
-            precision_matrix: Optional[chex.Array] = None
+        self,
+        x: chex.Array,
+        mu: Optional[chex.Array] = None,
+        covariance_matrix: Optional[chex.Array] = None,
+        precision_matrix: Optional[chex.Array] = None,
     ) -> chex.Array:
         """
         Estimate the Mahalanobis distance measure.
@@ -507,10 +571,10 @@ class MahalanobisDistance(DistanceMeasures):
         if mu is None:
             mu = jnp.zeros_like(x)
 
-        assert x.ndim == mu.ndim and x.shape == mu.shape, print(
-            f"The data point and the mean need to be of the same shape. Got x={x.shape} and y={y.shape}."
-        )
-        assert x.ndim <= 2 and mu.ndim <= 2, print(
+        assert (
+            x.ndim == mu.ndim and x.shape == mu.shape
+        ), f"The data point and the mean need to be of the same shape. Got x={x.shape} and y={y.shape}."
+        assert x.ndim <= 2 and mu.ndim <= 2, (
             f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
             f"Got x = {x.shape} and y = {mu.shape}."
         )
@@ -521,7 +585,10 @@ class MahalanobisDistance(DistanceMeasures):
 
         lower_tri_covariance = None
         if covariance_matrix is not None:
-            assert x.ndim == covariance_matrix.ndim-1 and x.shape == covariance_matrix.shape[:-1], print(
+            assert (
+                x.ndim == covariance_matrix.ndim - 1
+                and x.shape == covariance_matrix.shape[:-1]
+            ), (
                 f"The data point and the covariance need to be of the same shape. "
                 f"Got x={x.shape} and y={covariance_matrix.shape}."
             )
@@ -531,7 +598,10 @@ class MahalanobisDistance(DistanceMeasures):
 
         lower_tri_precision = None
         if precision_matrix is not None:
-            assert x.ndim == precision_matrix.ndim-1 and x.shape == precision_matrix.shape[:-1], print(
+            assert (
+                x.ndim == precision_matrix.ndim - 1
+                and x.shape == precision_matrix.shape[:-1]
+            ), (
                 f"The data point and the covariance need to be of the same shape. "
                 f"Got x={x.shape} and y={precision_matrix.shape}."
             )
@@ -544,9 +614,13 @@ class MahalanobisDistance(DistanceMeasures):
             lower_tri_precision = jnp.expand_dims(jnp.eye(d), 0).repeat(n, axis=0)
 
         if lower_tri_covariance is not None:
-            x_transformed = jax.vmap(jnp.linalg.solve)(lower_tri_covariance, x - mu)  # (n, d)
+            x_transformed = jax.vmap(jnp.linalg.solve)(
+                lower_tri_covariance, x - mu
+            )  # (n, d)
         elif lower_tri_precision is not None:
-            x_transformed = jnp.einsum("...mn, ...n->...m", lower_tri_precision, x - mu)  # (n, d)
+            x_transformed = jnp.einsum(
+                "...mn, ...n->...m", lower_tri_precision, x - mu
+            )  # (n, d)
         else:
             raise ValueError("Neither covariance nor precision matrices were given.")
 
@@ -584,40 +658,40 @@ class SquaredMahalanobisDistance(MahalanobisDistance):
     """
 
     def run(
-            self,
-            x: chex.Array,
-            mu: Optional[chex.Array] = None,
-            covariance_matrix: Optional[chex.Array] = None,
-            precision_matrix: Optional[chex.Array] = None
+        self,
+        x: chex.Array,
+        mu: Optional[chex.Array] = None,
+        covariance_matrix: Optional[chex.Array] = None,
+        precision_matrix: Optional[chex.Array] = None,
     ) -> chex.Array:
         """
-        Estimate the Mahalanobis distance measure.
+         Estimate the Mahalanobis distance measure.
 
-        Parameters
-        ----------
-       x: `chex.Array`
-            The input data point of shape (d, ) if particle, or (n, d) if time series.
-        mu: `chex.Array`, optional
-            The mean data point of shape (d, ) if particle, or (n, d) if time series. If not provided, mu = 0.
-        covariance_matrix: `chex.Array`, optional
-            The covariance matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
-            covariance_matrix = eye(d).
-        precision_matrix: `chex.Array`, optional
-            The precision matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
-            precision_matrix = eye(d).
+         Parameters
+         ----------
+        x: `chex.Array`
+             The input data point of shape (d, ) if particle, or (n, d) if time series.
+         mu: `chex.Array`, optional
+             The mean data point of shape (d, ) if particle, or (n, d) if time series. If not provided, mu = 0.
+         covariance_matrix: `chex.Array`, optional
+             The covariance matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
+             covariance_matrix = eye(d).
+         precision_matrix: `chex.Array`, optional
+             The precision matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
+             precision_matrix = eye(d).
 
-        Returns
-        -------
-        `chex.Array`:
-            The estimated squared Mahalanobis distance of shape ().
+         Returns
+         -------
+         `chex.Array`:
+             The estimated squared Mahalanobis distance of shape ().
         """
         if mu is None:
             mu = jnp.zeros_like(x)
 
-        assert x.ndim == mu.ndim and x.shape == mu.shape, print(
-            f"The data point and the mean need to be of the same shape. Got x={x.shape} and y={y.shape}."
-        )
-        assert x.ndim <= 2 and mu.ndim <= 2, print(
+        assert (
+            x.ndim == mu.ndim and x.shape == mu.shape
+        ), f"The data point and the mean need to be of the same shape. Got x={x.shape} and y={y.shape}."
+        assert x.ndim <= 2 and mu.ndim <= 2, (
             f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
             f"Got x = {x.shape} and y = {mu.shape}."
         )
@@ -628,7 +702,10 @@ class SquaredMahalanobisDistance(MahalanobisDistance):
 
         lower_tri_covariance = None
         if covariance_matrix is not None:
-            assert x.ndim == covariance_matrix.ndim-1 and x.shape == covariance_matrix.shape[:-1], print(
+            assert (
+                x.ndim == covariance_matrix.ndim - 1
+                and x.shape == covariance_matrix.shape[:-1]
+            ), (
                 f"The data point and the covariance need to be of the same shape. "
                 f"Got x={x.shape} and y={covariance_matrix.shape}."
             )
@@ -638,7 +715,10 @@ class SquaredMahalanobisDistance(MahalanobisDistance):
 
         lower_tri_precision = None
         if precision_matrix is not None:
-            assert x.ndim == precision_matrix.ndim-1 and x.shape == precision_matrix.shape[:-1], print(
+            assert (
+                x.ndim == precision_matrix.ndim - 1
+                and x.shape == precision_matrix.shape[:-1]
+            ), (
                 f"The data point and the covariance need to be of the same shape. "
                 f"Got x={x.shape} and y={precision_matrix.shape}."
             )
@@ -651,9 +731,13 @@ class SquaredMahalanobisDistance(MahalanobisDistance):
             lower_tri_precision = jnp.expand_dims(jnp.eye(d), 0).repeat(n, axis=0)
 
         if lower_tri_covariance is not None:
-            x_transformed = jax.vmap(jnp.linalg.solve)(lower_tri_covariance, x - mu)  # (n, d)
+            x_transformed = jax.vmap(jnp.linalg.solve)(
+                lower_tri_covariance, x - mu
+            )  # (n, d)
         elif lower_tri_precision is not None:
-            x_transformed = jnp.einsum("...mn, ...n->...m", lower_tri_precision, x - mu)  # (n, d)
+            x_transformed = jnp.einsum(
+                "...mn, ...n->...m", lower_tri_precision, x - mu
+            )  # (n, d)
         else:
             raise ValueError("Neither covariance nor precision matrices were given.")
 
@@ -699,10 +783,13 @@ class DynamicTimeWarping(DistanceMeasures):
         Available: https://ieeexplore.ieee.org/document/1163055
     [3] K. Heidler. (Soft-)DTW for JAX, Github, https://github.com/khdlr/softdtw_jax
     """
+
     distance: Optional[DistanceMeasures] = struct.field(default=None, pytree_node=False)
 
     @classmethod
-    def construct(cls, distance: Optional[DistanceMeasures] = None) -> "DynamicTimeWarping":
+    def construct(
+        cls, distance: Optional[DistanceMeasures] = None
+    ) -> "DynamicTimeWarping":
         """
         Construct the Dynamic Time Warping distance measure.
 
@@ -757,12 +844,18 @@ class DynamicTimeWarping(DistanceMeasures):
         """
         x = jnp.expand_dims(x, axis=1)
         y = jnp.expand_dims(y, axis=1)
-        distance_matrix = jax.vmap(jax.vmap(self.distance, in_axes=(0, None)), in_axes=(None, 0))(x, y)
+        distance_matrix = jax.vmap(
+            jax.vmap(self.distance, in_axes=(0, None)), in_axes=(None, 0)
+        )(x, y)
 
         h, _ = distance_matrix.shape
         rows = []
         for row in range(h):
-          rows.append(jnp.pad(distance_matrix[row], (row, h-row-1), constant_values=jnp.inf))
+            rows.append(
+                jnp.pad(
+                    distance_matrix[row], (row, h - row - 1), constant_values=jnp.inf
+                )
+            )
         return jnp.stack(rows, axis=1)
 
     def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
@@ -781,9 +874,10 @@ class DynamicTimeWarping(DistanceMeasures):
         `chex.Array`:
             The estimated Dynamic Time Warping distance of shape ().
         """
-        assert x.shape[-1] == y.shape[-1], print(
-            f"The two inputs need to have the same dimensionality. Got x = {x.shape} and y = {y.shape}.")
-        assert x.ndim <= 2 and y.ndim <= 2, print(
+        assert (
+            x.shape[-1] == y.shape[-1]
+        ), f"The two inputs need to have the same dimensionality. Got x = {x.shape} and y = {y.shape}."
+        assert x.ndim <= 2 and y.ndim <= 2, (
             f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
             f"Got x = {x.shape} and y = {y.shape}."
         )
@@ -810,7 +904,9 @@ class DynamicTimeWarping(DistanceMeasures):
 
         init = (
             jnp.pad(model_matrix[0], (1, 0), constant_values=jnp.inf),
-            jnp.pad(model_matrix[1] + model_matrix[0, 0], (1, 0), constant_values=jnp.inf)
+            jnp.pad(
+                model_matrix[1] + model_matrix[0, 0], (1, 0), constant_values=jnp.inf
+            ),
         )
         carry, ys = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
         return carry[1][-1]
@@ -849,10 +945,13 @@ class DiscreteFrechetDistance(DistanceMeasures):
       Available: http://www.kr.tuwien.ac.at/staff/eiter/et-archive/cdtr9464.pdf
     [3] K. Heidler. (Soft-)DTW for JAX, Github, https://github.com/khdlr/softdtw_jax
     """
+
     distance: Optional[DistanceMeasures] = struct.field(default=None, pytree_node=False)
 
     @classmethod
-    def construct(cls, distance: Optional[DistanceMeasures] = None) -> "DiscreteFrechetDistance":
+    def construct(
+        cls, distance: Optional[DistanceMeasures] = None
+    ) -> "DiscreteFrechetDistance":
         """
         Construct the discrete Frechet distance measure.
 
@@ -907,13 +1006,19 @@ class DiscreteFrechetDistance(DistanceMeasures):
         """
         x = jnp.expand_dims(x, axis=1)
         y = jnp.expand_dims(y, axis=1)
-        distance_matrix = jax.vmap(jax.vmap(self.distance, in_axes=(0, None)), in_axes=(None, 0))(x, y)
+        distance_matrix = jax.vmap(
+            jax.vmap(self.distance, in_axes=(0, None)), in_axes=(None, 0)
+        )(x, y)
 
         h, _ = distance_matrix.shape
 
         rows = []
         for row in range(h):
-          rows.append(jnp.pad(distance_matrix[row], (row, h-row-1), constant_values=jnp.inf))
+            rows.append(
+                jnp.pad(
+                    distance_matrix[row], (row, h - row - 1), constant_values=jnp.inf
+                )
+            )
         return jnp.stack(rows, axis=1)
 
     def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
@@ -932,9 +1037,10 @@ class DiscreteFrechetDistance(DistanceMeasures):
         `chex.Array`:
             The estimated Dynamic Time Warping distance of shape ().
         """
-        assert x.shape[-1] == y.shape[-1], print(
-            f"The two inputs need to have the same dimensionality. Got x = {x.shape} and y = {y.shape}.")
-        assert x.ndim <= 2 and y.ndim <= 2, print(
+        assert (
+            x.shape[-1] == y.shape[-1]
+        ), f"The two inputs need to have the same dimensionality. Got x = {x.shape} and y = {y.shape}."
+        assert x.ndim <= 2 and y.ndim <= 2, (
             f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
             f"Got x = {x.shape} and y = {y.shape}."
         )
@@ -964,8 +1070,8 @@ class DiscreteFrechetDistance(DistanceMeasures):
             jnp.pad(
                 jnp.maximum(model_matrix[1], model_matrix[0]),
                 (1, 0),
-                constant_values=jnp.inf
-            )
+                constant_values=jnp.inf,
+            ),
         )
 
         carry, ys = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
@@ -993,6 +1099,7 @@ class BaseCost(CostFn):
     `BaseCost`
         An instance of the base cost function.
     """
+
     weights: Optional[Sequence[float]] = None
     distances: Optional[Sequence[DistanceMeasures]] = None
 
@@ -1013,10 +1120,10 @@ class BaseCost(CostFn):
         `BaseCost`
             An instance of the base cost function.
         """
-        weights = [1., 1.]
+        weights = [1.0, 1.0]
         distances = [
             SquaredEuclideanDistance.construct(),
-            MinkowskiDistance.construct(p=1)
+            MinkowskiDistance.construct(p=1),
         ]
         return cls(weights=weights, distances=distances)
 
@@ -1104,18 +1211,21 @@ class SinkhornDistance(DistanceMeasures):
         Github: https://github.com/ott-jax/ott
         Docs: https://ott-jax.readthedocs.io/en/latest/
     """
+
     solver: Optional[Any] = None
     cost_fn: Optional[CostFn] = struct.field(default=None, pytree_node=False)
     epsilon: Optional[float] = struct.field(default=None, pytree_node=False)
-    return_regularized_cost: Optional[bool] = struct.field(default=None, pytree_node=False)
+    return_regularized_cost: Optional[bool] = struct.field(
+        default=None, pytree_node=False
+    )
 
     @classmethod
     def construct(
         cls,
-        epsilon: Optional[float]=None,
-        cost_fn: Optional[CostFn]=None,
-        return_regularized_cost: Optional[bool]=None,
-        ) -> "SinkhornDistance":
+        epsilon: Optional[float] = None,
+        cost_fn: Optional[CostFn] = None,
+        return_regularized_cost: Optional[bool] = None,
+    ) -> "SinkhornDistance":
         """
         Construct the Sinkhorn distance measure.
 
@@ -1134,16 +1244,16 @@ class SinkhornDistance(DistanceMeasures):
             An instance of the Sinkhorn distance measure.
         """
         if cost_fn is None:
-          cost_fn = BaseCost.construct()
+            cost_fn = BaseCost.construct()
 
         if return_regularized_cost is None:
-          return_regularized_cost = False
+            return_regularized_cost = False
 
         return cls(
             solver=sinkhorn.Sinkhorn(),
             epsilon=epsilon,
-            cost_fn = cost_fn,
-            return_regularized_cost=return_regularized_cost
+            cost_fn=cost_fn,
+            return_regularized_cost=return_regularized_cost,
         )
 
     @classmethod
@@ -1183,15 +1293,23 @@ class SinkhornDistance(DistanceMeasures):
         """
         # Add time to given arrays based on a linear interpolation
         n_x, _ = x.shape
-        x_extended = jnp.concatenate((x, jnp.linspace(0, 1, n_x)[:, jnp.newaxis]), axis=-1)
+        x_extended = jnp.concatenate(
+            (x, jnp.linspace(0, 1, n_x)[:, jnp.newaxis]), axis=-1
+        )
         n_y, _ = y.shape
-        y_extended = jnp.concatenate((y, jnp.linspace(0, 1, n_y)[:, jnp.newaxis]), axis=-1)
+        y_extended = jnp.concatenate(
+            (y, jnp.linspace(0, 1, n_y)[:, jnp.newaxis]), axis=-1
+        )
 
         # Generate and return a geometry for a Linear OT problem
         if self.epsilon is not None:
-            geometry = pointcloud.PointCloud(x_extended, y_extended, cost_fn=self.cost_fn, epsilon=self.epsilon)
+            geometry = pointcloud.PointCloud(
+                x_extended, y_extended, cost_fn=self.cost_fn, epsilon=self.epsilon
+            )
         else:
-            geometry = pointcloud.PointCloud(x_extended, y_extended, cost_fn=self.cost_fn)
+            geometry = pointcloud.PointCloud(
+                x_extended, y_extended, cost_fn=self.cost_fn
+            )
         return geometry
 
     def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
@@ -1210,9 +1328,10 @@ class SinkhornDistance(DistanceMeasures):
         `chex.Array`
             The estimated Sinkhorn distance of shape ().
         """
-        assert x.shape[-1] == y.shape[-1], print(
-            f"The two inputs need to have the same dimensionality. Got x = { x.shape} and y = {y.shape}.")
-        assert x.ndim <= 2 and y.ndim <= 2, print(
+        assert (
+            x.shape[-1] == y.shape[-1]
+        ), f"The two inputs need to have the same dimensionality. Got x = { x.shape} and y = {y.shape}."
+        assert x.ndim <= 2 and y.ndim <= 2, (
             f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
             f"Got x = {x.shape} and y = {y.shape}."
         )

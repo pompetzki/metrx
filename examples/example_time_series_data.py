@@ -9,13 +9,13 @@ from metriX import DistanceMeasures, StatisticalMeasures
 
 
 def _generate_trajectory(
-        time: chex.Array,
-        amplitude: chex.Array,
-        frequency: chex.Array,
-        offset_x: chex.Array,
-        offset_y: chex.Array,
-        phase_shift: chex.Array,
-        angle: float = 0.0
+    time: chex.Array,
+    amplitude: chex.Array,
+    frequency: chex.Array,
+    offset_x: chex.Array,
+    offset_y: chex.Array,
+    phase_shift: chex.Array,
+    angle: float = 0.0,
 ) -> chex.Array:
     """
     Generate a trajectory given the parameters.
@@ -43,19 +43,23 @@ def _generate_trajectory(
         Trajectory as (b, t, 2) array
 
     """
+
     def _rotate(array: chex.Array) -> chex.Array:
         rotation_matrix = jnp.array(
-            [[jnp.cos(angle), -jnp.sin(angle)],
-             [jnp.sin(angle), jnp.cos(angle)]]
+            [[jnp.cos(angle), -jnp.sin(angle)], [jnp.sin(angle), jnp.cos(angle)]]
         )
         return jnp.dot(array, rotation_matrix)
 
     tau = jnp.stack(
         (
             (time - jnp.max(time) / 2.0) + offset_x,
-            amplitude * jnp.sin(2 * jnp.pi * frequency * (time - jnp.max(time) / 2.0) + phase_shift) + offset_y
-        )
-        , axis=-1
+            amplitude
+            * jnp.sin(
+                2 * jnp.pi * frequency * (time - jnp.max(time) / 2.0) + phase_shift
+            )
+            + offset_y,
+        ),
+        axis=-1,
     )
 
     return _rotate(tau)
@@ -80,19 +84,41 @@ def get_samples(rng_key: chex.PRNGKey, **kwargs) -> chex.Array:
     time_steps = jnp.linspace(0.0, 1, kwargs["time_steps"])[jnp.newaxis, :]
 
     rng_key, *rng_samples = jax.random.split(rng_key, num=6)
-    amplitudes = kwargs["amplitude"] + jax.random.normal(
-        rng_samples[0], shape=(kwargs["batch_size"], 1)) * kwargs["sigma"]
-    frequencies = kwargs["frequency"] + jax.random.normal(
-        rng_samples[1], shape=(kwargs["batch_size"], 1)) * kwargs["sigma"]
-    offsets_x = kwargs["offset_x"] + jax.random.normal(
-        rng_samples[2], shape=(kwargs["batch_size"], 1)) * kwargs["sigma"]
-    offsets_y = kwargs["offset_y"] + jax.random.normal(
-        rng_samples[3], shape=(kwargs["batch_size"], 1)) * kwargs["sigma"]
-    phase_shift = kwargs["phase_shift"] + jax.random.normal(
-        rng_samples[4], shape=(kwargs["batch_size"], 1)) * kwargs["sigma"]
+    amplitudes = (
+        kwargs["amplitude"]
+        + jax.random.normal(rng_samples[0], shape=(kwargs["batch_size"], 1))
+        * kwargs["sigma"]
+    )
+    frequencies = (
+        kwargs["frequency"]
+        + jax.random.normal(rng_samples[1], shape=(kwargs["batch_size"], 1))
+        * kwargs["sigma"]
+    )
+    offsets_x = (
+        kwargs["offset_x"]
+        + jax.random.normal(rng_samples[2], shape=(kwargs["batch_size"], 1))
+        * kwargs["sigma"]
+    )
+    offsets_y = (
+        kwargs["offset_y"]
+        + jax.random.normal(rng_samples[3], shape=(kwargs["batch_size"], 1))
+        * kwargs["sigma"]
+    )
+    phase_shift = (
+        kwargs["phase_shift"]
+        + jax.random.normal(rng_samples[4], shape=(kwargs["batch_size"], 1))
+        * kwargs["sigma"]
+    )
 
     return _generate_trajectory(
-        time_steps, amplitudes, frequencies, offsets_x, offsets_y, phase_shift, kwargs["rotation"])
+        time_steps,
+        amplitudes,
+        frequencies,
+        offsets_x,
+        offsets_y,
+        phase_shift,
+        kwargs["rotation"],
+    )
 
 
 def visualize(xy: Sequence, costs: Dict) -> None:
@@ -115,7 +141,7 @@ def visualize(xy: Sequence, costs: Dict) -> None:
     matplotlib.use("TkAgg")
 
     # Create figure
-    fig, ax = plt.subplots(2,1, figsize=(12, 4))
+    fig, ax = plt.subplots(2, 1, figsize=(12, 4))
     ax.flatten()
 
     # Visualize trajectories
@@ -130,7 +156,11 @@ def visualize(xy: Sequence, costs: Dict) -> None:
     cell_text = []
     for key, val in costs.items():
         cell_text.append([key, val["mean"], val["std"], val["median"]])
-    table = ax[1].table(cellText=cell_text, colLabels=["Distance Measure", "Mean", "Std", "Median"], loc="center")
+    table = ax[1].table(
+        cellText=cell_text,
+        colLabels=["Distance Measure", "Mean", "Std", "Median"],
+        loc="center",
+    )
     table.auto_set_font_size(False)
     table.set_fontsize(8)
 
@@ -161,19 +191,24 @@ def main(**kwargs: Dict) -> None:
     for _Measure in [DistanceMeasures, StatisticalMeasures]:
         for _key in _Measure._registry.keys():
             _measure = _Measure.create_instance(_key)
-            if isinstance(_measure, DistanceMeasures):
-                costs = jax.vmap(jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None))(x, y)
-            else:
-                costs = _measure(x, y)
-            cost_dict.update(
-                {
-                    f"{_key}": {
-                    "mean": jnp.mean(costs),
-                    "std": jnp.std(costs),
-                    "median": jnp.median(costs)
+            try:
+                if isinstance(_measure, DistanceMeasures):
+                    costs = jax.vmap(
+                        jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
+                    )(x, y)
+                else:
+                    costs = _measure(x, y)
+                cost_dict.update(
+                    {
+                        f"{_key}": {
+                            "mean": jnp.mean(costs),
+                            "std": jnp.std(costs),
+                            "median": jnp.median(costs),
+                        }
                     }
-                }
-            )
+                )
+            except AssertionError as e:
+                print(f"AssertionError occurred: {e}")
 
     visualize((x, y), cost_dict)
 
@@ -191,7 +226,7 @@ if __name__ == "__main__":
             "offset_y": 0.0,
             "phase_shift": 0.0,
             "sigma": 0.05,
-            "rotation": 0.0
+            "rotation": 0.0,
         },
         "y": {
             "batch_size": 32,
@@ -202,7 +237,7 @@ if __name__ == "__main__":
             "offset_y": 0.0,
             "phase_shift": 1.0,
             "sigma": 0.05,
-            "rotation": 0.0
-        }
+            "rotation": 0.0,
+        },
     }
     main(**config)

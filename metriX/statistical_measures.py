@@ -28,6 +28,7 @@ class StatisticalMeasures(ABC):
     `DistanceMeasures`
         An instance of the base class for all statistical measures.
     """
+
     _registry = {}
 
     def __init_subclass__(cls, **kwargs: Dict) -> None:
@@ -47,7 +48,9 @@ class StatisticalMeasures(ABC):
         cls._registry[cls.__name__] = cls
 
     @classmethod
-    def create_instance(cls, name: Optional[str] = None, *args: Any, **kwargs: Any) -> "StatisticalMeasures":
+    def create_instance(
+        cls, name: Optional[str] = None, *args: Any, **kwargs: Any
+    ) -> "StatisticalMeasures":
         """
         Create an instance of the statistical measure using the name of the statistical measure.
 
@@ -70,7 +73,9 @@ class StatisticalMeasures(ABC):
             return cls._registry[name].create(*args, **kwargs)
         else:
             registered = ", ".join([key for key in cls._registry.keys()])
-            raise ValueError(f"Unknown class name: {name}. Registered measures: {registered}")
+            raise ValueError(
+                f"Unknown class name: {name}. Registered measures: {registered}"
+            )
 
     def __call__(self, *args: Any, **kwargs: Any) -> chex.Array:
         """
@@ -139,6 +144,7 @@ class RelativeEntropy(StatisticalMeasures):
     `RelativeEntropy`
         An instance of the relative entropy divergence measure.
     """
+
     reverse: Optional[bool] = struct.field(default=None, pytree_node=False)
     alpha: Optional[float] = struct.field(default=None, pytree_node=False)
     reg: Optional[float] = struct.field(default=None, pytree_node=False)
@@ -153,8 +159,8 @@ class RelativeEntropy(StatisticalMeasures):
         reg: float = 1e-5,
         mean: bool = False,
         median: bool = False,
-        total_sum: bool = False
-        ) -> "RelativeEntropy":
+        total_sum: bool = False,
+    ) -> "RelativeEntropy":
         """
         Construct an instance of the relative entropy divergence measure.
 
@@ -178,7 +184,9 @@ class RelativeEntropy(StatisticalMeasures):
         """
         if not mean and not median and not total_sum:
             total_sum = True
-        return cls(reverse=reverse, reg=reg, mean=mean, median=median, total_sum=total_sum)
+        return cls(
+            reverse=reverse, reg=reg, mean=mean, median=median, total_sum=total_sum
+        )
 
     @classmethod
     def create(cls, *args: Any, **kwargs: Any) -> "RelativeEntropy":
@@ -217,27 +225,23 @@ class RelativeEntropy(StatisticalMeasures):
         chex.Array
             The relative entropy divergence measure of shape (1, ).
         """
-        assert x.shape[1:] == y.shape[1:], (
-            f"The objects inside both batches need to have the same shape. Got {x.shape[1:]} and {y.shape[1:]}."
-        )
+        assert (
+            x.shape[1:] == y.shape[1:]
+        ), f"The objects inside both batches need to have the same shape. Got {x.shape[1:]} and {y.shape[1:]}."
         assert 3 >= x.ndim >= 1 and 3 >= y.ndim >= 1, (
             f"The two batches need to be of shape (b, d, ) if particles, or (b, n, d) if time series data. "
             f"Got x = {x.shape} and y = {y.shape}."
         )
-        if x.ndim == 2: x = x[..., jnp.newaxis, :]
-        if y.ndim == 2: y = y[..., jnp.newaxis, :]
+        if x.ndim == 2:
+            x = x[..., jnp.newaxis, :]
+        if y.ndim == 2:
+            y = y[..., jnp.newaxis, :]
 
         mean_x, tri_lower_x = fit_gaussian2data(x, self.reg)
         mean_y, tri_lower_y = fit_gaussian2data(y, self.reg)
 
-        mvnrml_x = distrax.MultivariateNormalTri(
-            loc=mean_x,
-            scale_tri=tri_lower_x
-        )
-        mvnrml_y = distrax.MultivariateNormalTri(
-            loc=mean_y,
-            scale_tri=tri_lower_y
-        )
+        mvnrml_x = distrax.MultivariateNormalTri(loc=mean_x, scale_tri=tri_lower_x)
+        mvnrml_y = distrax.MultivariateNormalTri(loc=mean_y, scale_tri=tri_lower_y)
 
         if self.reverse:
             relative_entropy = mvnrml_y.kl_divergence(mvnrml_x)[jnp.newaxis, ...]
@@ -278,6 +282,7 @@ class FrechetInceptionDistance(StatisticalMeasures):
         A boolean flag to compute the total sum of the FID over all time steps.
 
     """
+
     alpha: Optional[float] = struct.field(default=None, pytree_node=False)
     reg: Optional[float] = struct.field(default=None, pytree_node=False)
     mean: Optional[bool] = struct.field(default=None, pytree_node=False)
@@ -291,8 +296,8 @@ class FrechetInceptionDistance(StatisticalMeasures):
         reg: float = 1e-5,
         mean: bool = False,
         median: bool = False,
-        total_sum: bool = False
-        ) -> "FrechetInceptionDistance":
+        total_sum: bool = False,
+    ) -> "FrechetInceptionDistance":
         """
         Construct an instance of the Frechet Inception Distance measure.
 
@@ -339,7 +344,7 @@ class FrechetInceptionDistance(StatisticalMeasures):
         """
         return cls.construct(*args, **kwargs)
 
-    def run(self,  x: chex.Array, y: chex.Array) -> chex.Array:
+    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
         Run the total Frechet Inception Distance measure.
 
@@ -357,15 +362,17 @@ class FrechetInceptionDistance(StatisticalMeasures):
         `chex.Array`
             The Frechet Inception Distance measure of shape (1, ).
         """
-        assert x.shape[1:] == y.shape[1:], (
-            f"The objects inside both batches need to have the same shape. Got {x.shape[1:]} and {y.shape[1:]}."
-        )
+        assert (
+            x.shape[1:] == y.shape[1:]
+        ), f"The objects inside both batches need to have the same shape. Got {x.shape[1:]} and {y.shape[1:]}."
         assert 3 >= x.ndim >= 1 and 3 >= y.ndim >= 1, (
             f"The two batches need to be of shape (b, d, ) if particles, or (b, n, d) if time series data. "
             f"Got x = {x.shape} and y = {y.shape}."
         )
-        if x.ndim == 2: x = x[..., jnp.newaxis, :]
-        if y.ndim == 2: y = y[..., jnp.newaxis, :]
+        if x.ndim == 2:
+            x = x[..., jnp.newaxis, :]
+        if y.ndim == 2:
+            y = y[..., jnp.newaxis, :]
 
         mean_x, tri_lower_x = fit_gaussian2data(x, self.reg)
         mean_y, tri_lower_y = fit_gaussian2data(y, self.reg)
@@ -381,10 +388,14 @@ class FrechetInceptionDistance(StatisticalMeasures):
 
         cov_product = jnp.einsum("...mi, ...ni -> ...mn", cov_x, cov_y)
         eig_vals, eig_vecs = jax.vmap(jnp.linalg.eigh)(cov_product)
-        sqrt_cov_product = jnp.einsum("...mj,...j, ...nj->...mn", eig_vecs, jnp.sqrt(eig_vals), eig_vecs)
+        sqrt_cov_product = jnp.einsum(
+            "...mj,...j, ...nj->...mn", eig_vecs, jnp.sqrt(eig_vals), eig_vecs
+        )
         trace_sqrt_product = jax.vmap(jnp.trace)(sqrt_cov_product)
 
-        distances = mean_diff + self.alpha * (trace_cov_x + trace_cov_y - 2 * trace_sqrt_product)
+        distances = mean_diff + self.alpha * (
+            trace_cov_x + trace_cov_y - 2 * trace_sqrt_product
+        )
 
         if self.mean:
             return jnp.mean(distances, axis=-1)
@@ -417,6 +428,7 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
     `MaximumMeanDiscrepancy`
         An instance of the Maximum Mean Discrepancy measure
     """
+
     distance: Optional[DistanceMeasures] = struct.field(default=None, pytree_node=False)
     bandwidths: Optional[chex.Array] = struct.field(default=None, pytree_node=False)
     unbiased: Optional[bool] = struct.field(default=None, pytree_node=False)
@@ -424,10 +436,10 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
     @classmethod
     def construct(
         cls,
-        distance: Optional[DistanceMeasures]=None,
+        distance: Optional[DistanceMeasures] = None,
         bandwidths: Optional[Sequence[float]] = None,
-        unbiased: Optional[bool]=None,
-        ) -> "MaximumMeanDiscrepancy":
+        unbiased: Optional[bool] = None,
+    ) -> "MaximumMeanDiscrepancy":
         """
         Construct an instance of the Maximum Mean Discrepancy measure.
 
@@ -496,13 +508,17 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         `chex.Array`
             The Maximum Mean Discrepancy kernel of shape (B_x, B_y).
         """
-        distance_matrix = jax.vmap(jax.vmap(self.distance, in_axes=(None, 0)), in_axes=(0, None))(x, y)
+        distance_matrix = jax.vmap(
+            jax.vmap(self.distance, in_axes=(None, 0)), in_axes=(0, None)
+        )(x, y)
 
         def rbf_kernel(kernelized_dist: chex.Array, bandwidth: float) -> Any:
             return kernelized_dist + jnp.exp(-0.5 / bandwidth * distance_matrix), None
 
         kernelized_distance_matrix = jnp.zeros((x.shape[0], y.shape[0]))
-        kernelized_distance_matrix, _ = jax.lax.scan(rbf_kernel, kernelized_distance_matrix, self.bandwidths)
+        kernelized_distance_matrix, _ = jax.lax.scan(
+            rbf_kernel, kernelized_distance_matrix, self.bandwidths
+        )
         return kernelized_distance_matrix
 
     def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
@@ -531,8 +547,10 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
             f"The two batches need to be of shape (b, d, ) if particles, or (b, n, d) if time series data. "
             f"Got x = {x.shape} and y = {y.shape}."
         )
-        if x.ndim == 2: x = x[..., jnp.newaxis, :]
-        if y.ndim == 2: y = y[..., jnp.newaxis, :]
+        if x.ndim == 2:
+            x = x[..., jnp.newaxis, :]
+        if y.ndim == 2:
+            y = y[..., jnp.newaxis, :]
 
         kxx = self._mmd_kernel(x, x)
         i, j = jnp.diag_indices(kxx.shape[-1])
@@ -553,4 +571,4 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
             c_xx = 1 / b_x
             c_yy = 1 / b_y
 
-        return (c_xx * jnp.sum(kxx) - c_xy * jnp.sum(kxy) + c_yy * jnp.sum(kyy))
+        return c_xx * jnp.sum(kxx) - c_xy * jnp.sum(kxy) + c_yy * jnp.sum(kyy)
