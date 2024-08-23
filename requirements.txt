@@ -1,7 +1,7 @@
-chex>=0.1.86
+chex>=0.1.85
 distrax>=0.1.5
-flax>=0.8.5
-jax>=0.4.31
-matplotlib>=3.9.2
-optax>=0.2.3
-ott-jax>=0.4.7
+flax>=0.8.1
+jax>=0.4.25
+# matplotlib>=3.9.2
+optax>=0.1.7
+ott-jax>=0.4.5
