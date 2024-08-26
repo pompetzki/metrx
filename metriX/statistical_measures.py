@@ -427,7 +427,8 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
     @classmethod
     def construct(
         cls,
-        distance: Optional[DistanceMeasures] = None,
+        distance_measure: Union[DistanceMeasures, str] = "EuclideanDistance",
+        distance_kwargs: Dict = {},
         bandwidths: Optional[Union[Sequence[float], chex.Array]] = None,
         unbiased: bool = True,
     ) -> "MaximumMeanDiscrepancy":
@@ -449,8 +450,10 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         `MaximumMeanDiscrepancy`
             An instance of the Maximum Mean Discrepancy measure
         """
-        if distance is None:
-            distance = SquaredEuclideanDistance.construct()
+        if isinstance(distance_measure, str):
+            distance_measure = DistanceMeasures.create_instance(
+                distance_measure, **distance_kwargs
+            )
 
         if bandwidths is None:
             bandwidths = jnp.array(
@@ -459,7 +462,7 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         elif isinstance(bandwidths, Sequence):
             bandwidths = jnp.array(bandwidths)
 
-        return cls(distance=distance, bandwidths=bandwidths, unbiased=unbiased)
+        return cls(distance=distance_measure, bandwidths=bandwidths, unbiased=unbiased)
 
     def _mmd_kernel(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """

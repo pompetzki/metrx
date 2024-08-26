@@ -433,13 +433,19 @@ class CosineDistance(DistanceMeasures):
             The estimated cosine distance of shape ().
 
         """
+        assert (
+            x.shape == y.shape
+        ), f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
+
+        # Deal with pseudo-time series data, i.e., data of shape (1, d)
+        if x.ndim == 2 and x.shape[0] == 1:
+            x = x.squeeze(0)
+        if y.ndim == 2 and y.shape[0] == 1:
+            y = y.squeeze(0)
 
         assert (
             x.ndim == y.ndim <= 1
         ), f"The cosine distance only supports data of shape (d,), but received {x.shape}"
-        assert (
-            x.shape == y.shape
-        ), f"The two data points need to be of the same shape. Got x={x.shape} and y={y.shape}."
 
         dot_product = jnp.dot(x, y)
         cosine_similarity = dot_product / (jnp.linalg.norm(x) * jnp.linalg.norm(y))
