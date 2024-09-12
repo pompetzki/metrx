@@ -411,9 +411,11 @@ class SquaredEuclideanDistance(EuclideanDistance):
 # --------------------------------------------------------------------------------------------------------------------
 @struct.dataclass
 class CosineDistance(DistanceMeasures):
+    eps: float = struct.field(default=1e-8, pytree_node=False)
+
     @classmethod
-    def construct(cls) -> DistanceMeasures:
-        return cls()
+    def construct(cls, eps: float = 1e-8) -> "CosineDistance":
+        return cls(eps)
 
     def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
         """
@@ -447,9 +449,13 @@ class CosineDistance(DistanceMeasures):
             x.ndim == y.ndim <= 1
         ), f"The cosine distance only supports data of shape (d,), but received {x.shape}"
 
+        norm_x = jnp.maximum(jnp.linalg.norm(x), self.eps)
+        norm_y = jnp.maximum(jnp.linalg.norm(y), self.eps)
+
         dot_product = jnp.dot(x, y)
-        cosine_similarity = dot_product / (jnp.linalg.norm(x) * jnp.linalg.norm(y))
-        return 1 - cosine_similarity
+        cosine_similarity = dot_product / (norm_x * norm_y)
+        # cosine_similarity = jnp.clip(cosine_similarity, -1.0, 1.0)
+        return jnp.clip(1 - cosine_similarity, 0.0, 2.0)
 
 
 # --------------------------------------------------------------------------------------------------------------------
