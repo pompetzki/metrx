@@ -167,39 +167,42 @@ def test_trajectories() -> None:
     rng_key, rng_key_x, rng_key_y = jax.random.split(rng_key, num=3)
     x = get_samples(rng_key_x, **config["x"])
     y = get_samples(rng_key_y, **config["y"])
+    x_1D, y_1D = jnp.squeeze(x[:, 1, 1]), jnp.squeeze(y[:, 1, 1])
 
     for _Measure in [DistanceMeasures, StatisticalMeasures]:
         for _name in _Measure.list_all_names():
-            if _name not in ["CosineDistance", "MaximumMeanDiscrepancy"]:
-                _measure = _Measure.create_instance(_name)
-                if isinstance(_measure, DistanceMeasures):
-                    costs = jax.vmap(
-                        jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
-                    )(x, y)
-                    costs_jitted = jax.jit(jax.vmap(
-                        jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
-                    ))(x, y)
-                else:
-                    costs = _measure(x, y)
-                    costs_jitted = jax.jit(_measure)(x, y)
-                data = dict(mean=np.mean(costs), std=np.std(costs), median=np.median(costs))
-                data_jitted = dict(mean=np.mean(costs_jitted), std=np.std(costs_jitted), median=np.median(costs_jitted))
-
-                # save the results (can be used to update the test datasets
-                # np.savez(test_dir_path / f'test_datasets/{_name}.npz', **data)
-
-                # load the results
-                loaded = np.load(test_dir_path / f'test_datasets/{_name}.npz')
-
-                # assert close non-jitted
-                assert np.allclose(data["mean"], loaded["mean"]), f"{_name} failed: Mean not close"
-                assert np.allclose(data["std"], loaded["std"]), f"{_name} failed: Std not close"
-                assert np.allclose(data["median"], loaded["median"]), f"{_name} failed: Median not close"
-
-                # assert close jitted
-                assert np.allclose(data_jitted["mean"], loaded["mean"]), f"{_name} failed: Mean not close"
-                assert np.allclose(data_jitted["std"], loaded["std"]), f"{_name} failed: Std not close"
-                assert np.allclose(data_jitted["median"], loaded["median"]), f"{_name} failed: Median not"
-
+            _measure = _Measure.create_instance(_name)
+            inputs = (x_1D, y_1D) if _name == "CosineDistance" else (x, y)
+            if isinstance(_measure, DistanceMeasures):
+                costs = jax.vmap(
+                    jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
+                )(*inputs)
+                costs_jitted = jax.jit(jax.vmap(
+                    jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
+                ))(*inputs)
             else:
-                assert True     # todo: write test for CosineDistance
+                if _name != "MaximumMeanDiscrepancy":
+                    costs = _measure(*inputs)
+                    costs_jitted = jax.jit(_measure)(*inputs)
+                else:
+                    costs = _measure(*inputs)
+                    costs_jitted = costs    # todo: MMD not yet jitable!
+
+            data = dict(mean=np.mean(costs), std=np.std(costs), median=np.median(costs))
+            data_jitted = dict(mean=np.mean(costs_jitted), std=np.std(costs_jitted), median=np.median(costs_jitted))
+
+            # save the results (can be used to update the test datasets
+            # np.savez(test_dir_path / f'test_datasets/{_name}.npz', **data)
+
+            # load the results
+            loaded = np.load(test_dir_path / f'test_datasets/{_name}.npz')
+
+            # assert close non-jitted
+            assert np.allclose(data["mean"], loaded["mean"]), f"{_name} failed: Mean not close"
+            assert np.allclose(data["std"], loaded["std"]), f"{_name} failed: Std not close"
+            assert np.allclose(data["median"], loaded["median"]), f"{_name} failed: Median not close"
+
+            # assert close jitted
+            assert np.allclose(data_jitted["mean"], loaded["mean"]), f"{_name} failed: Mean not close"
+            assert np.allclose(data_jitted["std"], loaded["std"]), f"{_name} failed: Std not close"
+            assert np.allclose(data_jitted["median"], loaded["median"]), f"{_name} failed: Median not"
