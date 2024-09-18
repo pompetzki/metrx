@@ -1,10 +1,12 @@
+from typing import Dict
+from pathlib import Path
+
 import chex
 import jax
+import numpy as np
 import jax.numpy as jnp
-import matplotlib
-import matplotlib.pyplot as plt
 
-from typing import Dict, Sequence
+import metriX
 from metriX import DistanceMeasures, StatisticalMeasures
 
 
@@ -121,99 +123,12 @@ def get_samples(rng_key: chex.PRNGKey, **kwargs) -> chex.Array:
     )
 
 
-def visualize(xy: Sequence, costs: Dict) -> None:
+def test_trajectories() -> None:
     """
-    Visualize the generated data and the results.
-
-    Parameters
-    ----------
-    xy: Sequence
-        Tuple of generated trajectories.
-    costs: Dict
-        Dictionary of distance measures.
-
-    Returns
-    -------
-    None
+    Test all measures on trajectory data.
 
     """
-    # Set backend
-    matplotlib.use("TkAgg")
 
-    # Create figure
-    fig, ax = plt.subplots(2, 1, figsize=(12, 4))
-    ax.flatten()
-
-    # Visualize trajectories
-    for taus, color in zip(xy, ("blue", "orange")):
-        for sample in taus:
-            ax[0].plot(sample[..., 0], sample[..., 1], color=color, alpha=0.5)
-    ax[0].set(xlabel="x", ylabel="fy", title="Example: time-series data")
-    ax[0].grid()
-
-    # Visualize costs
-    ax[1].axis("off")
-    cell_text = []
-    for key, val in costs.items():
-        cell_text.append([key, val["mean"], val["std"], val["median"]])
-    table = ax[1].table(
-        cellText=cell_text,
-        colLabels=["Distance Measure", "Mean", "Std", "Median"],
-        loc="center",
-    )
-    table.auto_set_font_size(False)
-    table.set_fontsize(8)
-
-    plt.show()
-
-
-def main(**kwargs: Dict) -> None:
-    """
-    Main function to generate samples and calculate distance measures between two batches of trajectories.
-
-    Parameters
-    ----------
-    kwargs: Dict
-        Dictionary of configuration parameters.
-
-    Returns
-    -------
-    None
-
-    """
-    rng_key = jax.random.PRNGKey(kwargs["seed"])
-
-    rng_key, rng_key_x, rng_key_y = jax.random.split(rng_key, num=3)
-    x = get_samples(rng_key_x, **kwargs["x"])
-    y = get_samples(rng_key_y, **kwargs["y"])
-
-    cost_dict = {}
-    for _Measure in [DistanceMeasures, StatisticalMeasures]:
-        for _name in _Measure.list_all_names():
-            _measure = _Measure.create_instance(_name)
-            try:
-                if isinstance(_measure, DistanceMeasures):
-                    costs = jax.vmap(
-                        jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
-                    )(x, y)
-                else:
-                    costs = _measure(x, y)
-                cost_dict.update(
-                    {
-                        f"{_name}": {
-                            "mean": jnp.mean(costs),
-                            "std": jnp.std(costs),
-                            "median": jnp.median(costs),
-                        }
-                    }
-                )
-            except AssertionError as e:
-                print(f"AssertionError occurred: {e}")
-
-    visualize((x, y), cost_dict)
-
-
-if __name__ == "__main__":
     config = {
         "seed": 0,
         "dim": 2,
@@ -240,4 +155,51 @@ if __name__ == "__main__":
             "rotation": 0.0,
         },
     }
-    main(**config)
+
+    # set Jax-backend to CPU
+    jax.config.update('jax_platform_name', 'cpu')
+    print(f"Jax backend device: {jax.default_backend()} \n")
+
+    test_dir_path = Path(metriX.__file__).parent.parent / "tests"
+
+    rng_key = jax.random.PRNGKey(config["seed"])
+
+    rng_key, rng_key_x, rng_key_y = jax.random.split(rng_key, num=3)
+    x = get_samples(rng_key_x, **config["x"])
+    y = get_samples(rng_key_y, **config["y"])
+
+    for _Measure in [DistanceMeasures, StatisticalMeasures]:
+        for _name in _Measure.list_all_names():
+            if _name not in ["CosineDistance", "MaximumMeanDiscrepancy"]:
+                _measure = _Measure.create_instance(_name)
+                if isinstance(_measure, DistanceMeasures):
+                    costs = jax.vmap(
+                        jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
+                    )(x, y)
+                    costs_jitted = jax.jit(jax.vmap(
+                        jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
+                    ))(x, y)
+                else:
+                    costs = _measure(x, y)
+                    costs_jitted = jax.jit(_measure)(x, y)
+                data = dict(mean=np.mean(costs), std=np.std(costs), median=np.median(costs))
+                data_jitted = dict(mean=np.mean(costs_jitted), std=np.std(costs_jitted), median=np.median(costs_jitted))
+
+                # save the results (can be used to update the test datasets
+                # np.savez(test_dir_path / f'test_datasets/{_name}.npz', **data)
+
+                # load the results
+                loaded = np.load(test_dir_path / f'test_datasets/{_name}.npz')
+
+                # assert close non-jitted
+                assert np.allclose(data["mean"], loaded["mean"]), f"{_name} failed: Mean not close"
+                assert np.allclose(data["std"], loaded["std"]), f"{_name} failed: Std not close"
+                assert np.allclose(data["median"], loaded["median"]), f"{_name} failed: Median not close"
+
+                # assert close jitted
+                assert np.allclose(data_jitted["mean"], loaded["mean"]), f"{_name} failed: Mean not close"
+                assert np.allclose(data_jitted["std"], loaded["std"]), f"{_name} failed: Std not close"
+                assert np.allclose(data_jitted["median"], loaded["median"]), f"{_name} failed: Median not"
+
+            else:
+                assert True     # todo: write test for CosineDistance

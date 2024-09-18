@@ -95,15 +95,15 @@ def main(**kwargs: Dict) -> None:
 
     cost_dict = {}
     for _Measure in [DistanceMeasures, StatisticalMeasures]:
-        for _key in _Measure._registry.keys():
-            _measure = _Measure.create_instance(_key)
+        for _name in _Measure.list_all_names():
+            _measure = _Measure.create_instance(_name)
             if isinstance(_measure, DistanceMeasures):
                 costs = jax.vmap(jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None))(x, y)
             else:
                 costs = _measure(x, y)
             cost_dict.update(
                 {
-                    f"{_key}": {
+                    f"{_name}": {
                         "mean": jnp.mean(costs),
                         "std": jnp.std(costs),
                         "median": jnp.median(costs)
