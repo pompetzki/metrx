@@ -143,6 +143,30 @@ class StatisticalMeasures(ABC):
         """
         raise NotImplementedError
 
+    @classmethod
+    def list_all_names(cls):
+        """
+        Get the names of the registered distance measures.
+
+        Returns
+        -------
+        `List[str]`
+            The names of the registered distance measures.
+        """
+        return list(cls._registry.keys())
+
+    @classmethod
+    def list_all(cls):
+        """
+        Get the classes of all the registered distance measures.
+
+        Returns
+        -------
+        `List[str]`
+            The classes of the registered distance measures.
+
+        """
+        return list(cls._registry.values())
 
 # --------------------------------------------------------------------------------------------------------------------
 # -------------------------------------------- Relative Entropy Divergence -------------------------------------------

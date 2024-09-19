@@ -138,6 +138,31 @@ class DistanceMeasures(ABC):
         """
         raise NotImplementedError
 
+    @classmethod
+    def list_all_names(cls):
+        """
+        Get the names of the registered distance measures.
+
+        Returns
+        -------
+        `List[str]`
+            The names of the registered distance measures.
+        """
+        return list(cls._registry.keys())
+
+    @classmethod
+    def list_all(cls):
+        """
+        Get the classes of all the registered distance measures.
+
+        Returns
+        -------
+        `List[str]`
+            The classes of the registered distance measures.
+
+        """
+        return list(cls._registry.values())
+
 
 # --------------------------------------------------------------------------------------------------------------------
 # ------------------------------------------------ Minkowski Distance ------------------------------------------------
@@ -545,7 +570,7 @@ class MahalanobisDistance(DistanceMeasures):
 
         assert (
             x.ndim == mu.ndim and x.shape == mu.shape
-        ), f"The data point and the mean need to be of the same shape. Got x={x.shape} and y={y.shape}."
+        ), f"The data point and the mean need to be of the same shape. Got x={x.shape}."
         assert x.ndim <= 2 and mu.ndim <= 2, (
             f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
             f"Got x = {x.shape} and y = {mu.shape}."
@@ -662,7 +687,7 @@ class SquaredMahalanobisDistance(MahalanobisDistance):
 
         assert (
             x.ndim == mu.ndim and x.shape == mu.shape
-        ), f"The data point and the mean need to be of the same shape. Got x={x.shape} and y={y.shape}."
+        ), f"The data point and the mean need to be of the same shape. Got x={x.shape}."
         assert x.ndim <= 2 and mu.ndim <= 2, (
             f"The two inputs need to be of shape (d, ) if particle, or (n, d) if time series. "
             f"Got x = {x.shape} and y = {mu.shape}."
