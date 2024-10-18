@@ -88,7 +88,7 @@ class StatisticalMeasures(ABC):
         """Create an Instance of the statistical distance measure"""
 
     @classmethod
-    def create(cls, *args: Any, **kwargs: Any) -> "RelativeEntropy":
+    def create(cls, *args: Any, **kwargs: Any) -> "StatisticalMeasures":
         """
         Create an instance of the the statistical distance measure.
 
@@ -167,6 +167,7 @@ class StatisticalMeasures(ABC):
 
         """
         return list(cls._registry.values())
+
 
 # --------------------------------------------------------------------------------------------------------------------
 # -------------------------------------------- Relative Entropy Divergence -------------------------------------------
