@@ -586,7 +586,7 @@ class OTTCostWrapper(CostFn):
     def construct(cls, distance_measure: DistanceMeasures):
         return cls(distance_measure)
 
-    def pairwise(self, x: jax.Array, y: jax.Array) -> float:
+    def __call__(self, x: jax.Array, y: jax.Array) -> float:
         distance = self.distance_measure(x, y)
         return distance.squeeze()
 

@@ -1041,7 +1041,7 @@ class DiscreteFrechetDistance(DistanceMeasures):
 # ------------------------------------------------- Sinkhorn Distance ------------------------------------------------
 # --------------------------------------------------------------------------------------------------------------------
 @struct.dataclass
-class BaseCost(CostFn):
+class OTTCostWrapper(CostFn):
     """
     The base cost function for the Sinkhorn distance measure. The cost function is a weighted sum of the spatial and
     temporal distances.
@@ -1055,15 +1055,14 @@ class BaseCost(CostFn):
 
     Returns
     -------
-    `BaseCost`
+    `OTTCostWrapper`
         An instance of the base cost function.
     """
-
     weights: Optional[Sequence[float]] = None
     distances: Optional[Sequence[DistanceMeasures]] = None
 
     @classmethod
-    def construct(cls, *args: Any, **kwargs: Any) -> "BaseCost":
+    def construct(cls, *args: Any, **kwargs: Any) -> "OTTCostWrapper":
         """
         Construct the base cost function for the Sinkhorn distance measure.
 
@@ -1076,7 +1075,7 @@ class BaseCost(CostFn):
 
         Returns
         -------
-        `BaseCost`
+        `OTTCostWrapper`
             An instance of the base cost function.
         """
         weights = [1.0, 1.0]
@@ -1087,7 +1086,7 @@ class BaseCost(CostFn):
         return cls(weights=weights, distances=distances)
 
     @classmethod
-    def create(cls, *args: Any, **kwargs: Any) -> "BaseCost":
+    def create(cls, *args: Any, **kwargs: Any) -> "OTTCostWrapper":
         """
         Create an instance of the base cost function for the Sinkhorn distance measure.
 
@@ -1100,12 +1099,12 @@ class BaseCost(CostFn):
 
         Returns
         -------
-        `BaseCost`
+        `OTTCostWrapper`
             An instance of the base cost function.
         """
         return cls.construct(*args, **kwargs)
 
-    def pairwise(self, x: jnp.ndarray, y: jnp.ndarray) -> float:
+    def __call__(self, x: jnp.ndarray, y: jnp.ndarray) -> float:
         """
         Calculate the pairwise cost between two points.
 
@@ -1201,7 +1200,7 @@ class SinkhornDistance(DistanceMeasures):
             An instance of the Sinkhorn distance measure.
         """
         if cost_fn is None:
-            cost_fn = BaseCost.construct()
+            cost_fn = OTTCostWrapper.construct()
 
         return cls(
             solver=sinkhorn.Sinkhorn(),
