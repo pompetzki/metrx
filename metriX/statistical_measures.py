@@ -1,19 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import Sequence, Optional, Any, Dict, Union
+from typing import Sequence, Optional, Any, Dict, Tuple, Union
 
 import chex
 import distrax
 import jax
 import jax.numpy as jnp
 from flax import struct
-from jax.numpy import ndarray
 from ott.geometry import pointcloud
 from ott.solvers.linear import sinkhorn
 from ott.problems.linear import linear_problem
 from ott.geometry.costs import CostFn
 
 from metriX.distance_measures import DistanceMeasures
-from metriX.distance_measures import SquaredEuclideanDistance, EuclideanDistance
 from metriX.utils import fit_gaussian2data
 
 
@@ -446,7 +444,8 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
     """
 
     distance: DistanceMeasures = struct.field(pytree_node=False)
-    bandwidths: chex.Array = struct.field(pytree_node=False)
+
+    bandwidths: Tuple = struct.field(pytree_node=False)
     unbiased: Optional[bool] = struct.field(default=True, pytree_node=False)
 
     @classmethod
@@ -454,7 +453,7 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         cls,
         distance_measure: Union[DistanceMeasures, str] = "EuclideanDistance",
         distance_kwargs: Dict = {},
-        bandwidths: Optional[Union[Sequence[float], chex.Array]] = None,
+        bandwidths: Optional[Union[Sequence[float], Tuple]] = None,
         unbiased: bool = True,
     ) -> "MaximumMeanDiscrepancy":
         """
@@ -481,11 +480,22 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
             )
 
         if bandwidths is None:
-            bandwidths = jnp.array(
-                [1.0, 10.0, 20.0, 40.0, 80.0, 100.0, 130.0, 200.0, 400.0, 800.0, 1000.0]
+            bandwidths = (
+                1.0,
+                10.0,
+                20.0,
+                40.0,
+                80.0,
+                100.0,
+                130.0,
+                200.0,
+                400.0,
+                800.0,
+                1000.0,
             )
+
         elif isinstance(bandwidths, Sequence):
-            bandwidths = jnp.array(bandwidths)
+            bandwidths = tuple(bandwidths)
 
         return cls(distance=distance_measure, bandwidths=bandwidths, unbiased=unbiased)
 
@@ -516,7 +526,7 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
 
         kernelized_distance_matrix = jnp.zeros((x.shape[0], y.shape[0]))
         kernelized_distance_matrix, _ = jax.lax.scan(
-            rbf_kernel, kernelized_distance_matrix, self.bandwidths
+            rbf_kernel, kernelized_distance_matrix, jnp.array(self.bandwidths)
         )
         return kernelized_distance_matrix
 

@@ -39,6 +39,7 @@ CONFIG = {
 }
 TEST_DIR_PATH = Path(metriX.__file__).parent.parent / "tests"
 
+
 def _generate_trajectory(
     time: chex.Array,
     amplitude: chex.Array,
@@ -152,14 +153,17 @@ def get_samples(rng_key: chex.PRNGKey, **kwargs) -> chex.Array:
     )
 
 
-@pytest.mark.parametrize("dist_type,name", [
-    (dist_type, name) 
-    for dist_type, name_list in [
-        (DistanceMeasures, DistanceMeasures.list_all_names()), 
-        (StatisticalMeasures, StatisticalMeasures.list_all_names())
-    ] 
-    for name in name_list
-])
+@pytest.mark.parametrize(
+    "dist_type,name",
+    [
+        (dist_type, name)
+        for dist_type, name_list in [
+            (DistanceMeasures, DistanceMeasures.list_all_names()),
+            (StatisticalMeasures, StatisticalMeasures.list_all_names()),
+        ]
+        for name in name_list
+    ],
+)
 def test_distances(dist_type: DistanceMeasures | StatisticalMeasures, name: str):
     # set Jax-backend to CPU
     jax.config.update("jax_platform_name", "cpu")
@@ -176,16 +180,15 @@ def test_distances(dist_type: DistanceMeasures | StatisticalMeasures, name: str)
     inputs = (x_1D, y_1D) if name == "CosineDistance" else (x, y)
 
     if isinstance(_measure, DistanceMeasures):
-        costs = jax.vmap(
-                        jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
-                    )(*inputs)
+        costs = jax.vmap(jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None))(
+            *inputs
+        )
         costs_jitted = jax.jit(
             jax.vmap(jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None))
         )(*inputs)
     else:
         costs = _measure(*inputs)
-        # TODO: check why jax.jit(_measure)(*inputs) does not work for MMD
-        costs_jitted = jax.jit(_measure.run)(*inputs)
+        costs_jitted = jax.jit(_measure)(*inputs)
 
     data = dict(mean=np.mean(costs), std=np.std(costs), median=np.median(costs))
     data_jitted = dict(
@@ -198,12 +201,8 @@ def test_distances(dist_type: DistanceMeasures | StatisticalMeasures, name: str)
     loaded = np.load(TEST_DIR_PATH / f"test_datasets/{name}.npz")
 
     # assert close non-jitted
-    assert np.allclose(
-        data["mean"], loaded["mean"]
-    ), f"{name} failed: Mean not close"
-    assert np.allclose(
-        data["std"], loaded["std"]
-    ), f"{name} failed: Std not close"
+    assert np.allclose(data["mean"], loaded["mean"]), f"{name} failed: Mean not close"
+    assert np.allclose(data["std"], loaded["std"]), f"{name} failed: Std not close"
     assert np.allclose(
         data["median"], loaded["median"]
     ), f"{name} failed: Median not close"
