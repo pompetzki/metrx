@@ -642,7 +642,7 @@ class WassersteinDistance(StatisticalMeasures):
                 distance_measure, **distance_kwargs
             )
 
-        # Build costfunction wrapper for the ott-jax library
+        # Build cost function wrapper for the ott-jax library
         cost_fn = OTTCostWrapper.construct(distance_measure)
 
         return cls(cost_fn, epsilon, return_regularized_cost)
