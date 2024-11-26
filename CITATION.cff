@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Pompetzki
+    given-names: Kay
+  - family-names: Gruner
+    given-names: Theo
+  - family-names: Al-Hafez
+    given-names: Firas
+  - family-names: Peters
+    given-names: Jan
+title: "MetriX: A JAX-Based Collection of Similarity and Statistical Measures for Accelerated Data Analysis."
+date-released: 2024-11-26

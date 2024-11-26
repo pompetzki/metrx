@@ -5,12 +5,35 @@
 
 
 
-A library containing a collection of distance and similarity measures to compare time series data.
+A lightweight **JAX**-based library offering a collection of distance and similarity measures for data analysis. Designed for
+scalability and accelerator support, it includes high-performance, parallelizable implementations of a wide range of commonly
+used metrics.
 
-## Installation & Usage
+## Installation 
 ```bash
 pip install -e .
 ```
+
+## Implemented Metrics
+This library is still in development and more metrics will be added over time.
+The following metrics are currently implemented.
+### Distance Measures
+- [Minkowski Distance](https://github.com/pompetzki/metriX/blob/main/metrix/distance_measures.py#L171)
+- [Euclidean Distance](https://github.com/pompetzki/metriX/blob/main/metrix/distance_measures.py#L277)
+- [Cosine Distance](https://github.com/pompetzki/metriX/blob/main/metrix/distance_measures.py#L438)
+- [Mahalanobis Distance](https://github.com/pompetzki/metriX/blob/main/metrix/distance_measures.py#L490)
+- [Dynamic Time Warping](https://github.com/pompetzki/metriX/blob/main/metrix/distance_measures.py#L754)
+- [Discrete Frechet Distance](https://github.com/pompetzki/metriX/blob/main/metrix/distance_measures.py#L897)
+- [Sinkhorn Distance](https://github.com/pompetzki/metriX/blob/main/metrix/distance_measures.py#L1136)
+
+### Statistical Measures
+- [Relative Entropy (Kullback-Leibler Divergence)](https://github.com/pompetzki/metriX/blob/main/metrix/statistical_measures.py#L174)
+- [Frechet Inception Distance](https://github.com/pompetzki/metriX/blob/main/metrix/statistical_measures.py#L295)
+- [Maximum Mean Discrepancy](https://github.com/pompetzki/metriX/blob/main/metrix/statistical_measures.py#L425)
+- [Wassersteim Distance](https://github.com/pompetzki/metriX/blob/main/metrix/statistical_measures.py#L605)
+
+
+## Examples
 To test, there are two examples:
 Either compare batches of particles
 ```bash
@@ -21,3 +44,13 @@ or batches of time series data
 python examples/example_time_series_data.py
 ```
     
+## Citation
+If you use this libarary in your work, please consider citing it as follows:
+```
+@software{metrix2024github,
+  author = {Pompetzki, Kay and Gruner, Theo and Al-Hafez, Firas, and Peters, Jan},
+  title = {MetriX: A JAX-Based Collection of Similarity and Statistical Measures for Accelerated Data Analysis.},
+  url = {https://github.com/pompetzki/metriX},
+  year = {2024},
+}
+```
