@@ -1,5 +1,0 @@
-name: metriX_env
-channels:
-  - defaults
-dependencies:
-  - python=3.10

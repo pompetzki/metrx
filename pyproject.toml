@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "metrix"
+version = "0.1.0"
+authors =[{name= "Kay Hansel", email="kay.hansel@tu-darmstadt.de"},
+    {name="Theo Gruner", email="theo_sunao.gruner@tu-darmstadt.de"},
+    {name="Firas Al-Hafez", email="fi.alhafez@gmail.com"}]
+requires-python = ">=3.10"
+description = '"A library containing a collection of distance and similarity measures to compare time series data."'
+readme = "README.md"
+license = { file= "LICENSE" }
+keywords = ["Distance Measures", "Statistical Measures", "jax"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "chex>=0.1.85",
+    "distrax>=0.1.5",
+    "flax>=0.8.1",
+    "jax>=0.4.25",
+    "optax>=0.1.7",
+    "ott-jax>=0.4.9",
+    "numpy",
+    "pytest"]
+
+[project.urls]
+Homepage = "https://github.com/pompetzki/metriX"
+Repository = "https://github.com/pompetzki/metriX"
+Issues = "https://github.com/pompetzki/metriX/issues"

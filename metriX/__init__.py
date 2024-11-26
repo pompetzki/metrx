@@ -1,2 +1,2 @@
-from metriX.distance_measures import DistanceMeasures
-from metriX.statistical_measures import StatisticalMeasures
+from metrix.distance_measures import DistanceMeasures
+from metrix.statistical_measures import StatisticalMeasures

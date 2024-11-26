@@ -7,8 +7,8 @@ import jax
 import numpy as np
 import jax.numpy as jnp
 
-import metriX
-from metriX import DistanceMeasures, StatisticalMeasures
+import metrix
+from metrix import DistanceMeasures, StatisticalMeasures
 
 
 CONFIG = {
@@ -37,7 +37,7 @@ CONFIG = {
         "rotation": 0.0,
     },
 }
-TEST_DIR_PATH = Path(metriX.__file__).parent.parent / "tests"
+TEST_DIR_PATH = Path(metrix.__file__).parent.parent / "tests"
 
 
 def _generate_trajectory(

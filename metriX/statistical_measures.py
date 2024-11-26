@@ -11,8 +11,8 @@ from ott.solvers.linear import sinkhorn
 from ott.problems.linear import linear_problem
 from ott.geometry.costs import CostFn
 
-from metriX.distance_measures import DistanceMeasures
-from metriX.utils import fit_gaussian2data
+from metrix.distance_measures import DistanceMeasures
+from metrix.utils import fit_gaussian2data
 
 
 @struct.dataclass
