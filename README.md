@@ -1,7 +1,8 @@
-![metrx_logo](https://github.com/user-attachments/assets/32dc9c40-106b-476f-801b-4b9ae25b1433)
+![metrix_loogv3](https://github.com/user-attachments/assets/51f66576-866f-4a89-a17b-8154bc7a8381)
 
 ![continous integration](https://github.com/pompetzki/metrx/actions/workflows/continuous_integration.yml/badge.svg?branch=main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PyPI](https://img.shields.io/pypi/v/metrx)](https://pypi.org/project/metrx/)
 
 
 
