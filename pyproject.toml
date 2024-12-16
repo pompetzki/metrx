@@ -2,7 +2,7 @@
 requires = ["setuptools", "wheel"]
 
 [project]
-name = "metrix"
+name = "metrx"
 version = "0.1.0"
 authors =[{name= "Kay Pompetzki", email="kay.hansel@tu-darmstadt.de"},
     {name="Theo Gruner", email="theo_sunao.gruner@tu-darmstadt.de"},
@@ -18,7 +18,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "chex>=0.1.85",
     "distrax>=0.1.5",
     "flax>=0.8.1",
     "jax>=0.4.25",
@@ -28,6 +27,6 @@ dependencies = [
     "pytest"]
 
 [project.urls]
-Homepage = "https://github.com/pompetzki/metriX"
-Repository = "https://github.com/pompetzki/metriX"
-Issues = "https://github.com/pompetzki/metriX/issues"
+Homepage = "https://github.com/pompetzki/metrx"
+Repository = "https://github.com/pompetzki/metrx"
+Issues = "https://github.com/pompetzki/metrx/issues"

@@ -1,4 +1,3 @@
-import chex
 import jax
 import jax.numpy as jnp
 
@@ -101,7 +100,7 @@ class DistanceMeasures(ABC):
         """
         return cls.construct(*args, **kwargs)
 
-    def __call__(self, *args: Any, **kwargs: Any) -> chex.Array:
+    def __call__(self, *args: Any, **kwargs: Any) -> jax.Array:
         """
         Call the distance measure.
 
@@ -114,13 +113,13 @@ class DistanceMeasures(ABC):
 
         Returns
         -------
-        `chex.Array`
+        `jax.Array`
             The estimated distance measure.
         """
         return self.run(*args, **kwargs)
 
     @abstractmethod
-    def run(self, *args: Any, **kwargs: Any) -> chex.Array:
+    def run(self, *args: Any, **kwargs: Any) -> jax.Array:
         """
         Estimate the distance measure.
 
@@ -133,7 +132,7 @@ class DistanceMeasures(ABC):
 
         Returns
         -------
-        `chex.Array`
+        `jax.Array`
             The estimated distance measure.
         """
         raise NotImplementedError
@@ -231,20 +230,20 @@ class MinkowskiDistance(DistanceMeasures):
             total_sum = True
         return cls(p=p, mean=mean, median=median, total_sum=total_sum)
 
-    def run(self, x: chex.Array, y: Optional[chex.Array] = None) -> chex.Array:
+    def run(self, x: jax.Array, y: Optional[jax.Array] = None) -> jax.Array:
         """
         Estimate the Minkowski distance measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             The input data of shape (d, ) if particle, or (n, d) if time series.
-        y: `chex.Array`, optional
+        y: `jax.Array`, optional
             The second input data of shape (d, ) if particle, or (n, d) if time series. If not provided, y = 0.
 
         Returns
         -------
-        `chex.Array`:
+        `jax.Array`:
             The estimated Minkowski distance of shape ().
         """
         if y is None:
@@ -325,20 +324,20 @@ class EuclideanDistance(DistanceMeasures):
             total_sum = True
         return cls(mean=mean, median=median, total_sum=total_sum)
 
-    def run(self, x: chex.Array, y: Optional[chex.Array] = None) -> chex.Array:
+    def run(self, x: jax.Array, y: Optional[jax.Array] = None) -> jax.Array:
         """
         Estimate the Euclidean distance measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             The input data point of shape (d, ) if particle, or (n, d) if time series.
-        y: `chex.Array`, optional
+        y: `jax.Array`, optional
             The second input data of shape (d, ) if particle, or (n, d) if time series. If not provided, y = 0.
 
         Returns
         -------
-        `chex.Array`:
+        `jax.Array`:
             The estimated Euclidean distance of shape ().
         """
         if y is None:
@@ -390,20 +389,20 @@ class SquaredEuclideanDistance(EuclideanDistance):
         An instance of the squared Euclidean distance measure.
     """
 
-    def run(self, x: chex.Array, y: Optional[chex.Array] = None) -> chex.Array:
+    def run(self, x: jax.Array, y: Optional[jax.Array] = None) -> jax.Array:
         """
         Estimate the squared Euclidean distance measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             The input data point of shape (d, ) if particle, or (n, d) if time series.
-        y: `chex.Array`, optional
+        y: `jax.Array`, optional
             The second input data of shape (d, ) if particle, or (n, d) if time series. If not provided, y = 0.
 
         Returns
         -------
-        `chex.Array`:
+        `jax.Array`:
             The estimated squared Euclidean distance of shape ().
 
         """
@@ -442,21 +441,21 @@ class CosineDistance(DistanceMeasures):
     def construct(cls, eps: float = 1e-8) -> "CosineDistance":
         return cls(eps)
 
-    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
+    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
         Estimate the Cosine distance measure d = 1 - 'cosine similarity'.
         Note that the cosine distance is only a quasi-metric.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             The input data point of shape (d, ). Time series data is not supported at this point
-        y: `chex.Array`, optional
+        y: `jax.Array`, optional
             The second input data of shape (d, ).
 
         Returns
         -------
-        `chex.Array`:
+        `jax.Array`:
             The estimated cosine distance of shape ().
 
         """
@@ -539,30 +538,30 @@ class MahalanobisDistance(DistanceMeasures):
 
     def run(
         self,
-        x: chex.Array,
-        mu: Optional[chex.Array] = None,
-        covariance_matrix: Optional[chex.Array] = None,
-        precision_matrix: Optional[chex.Array] = None,
-    ) -> chex.Array:
+        x: jax.Array,
+        mu: Optional[jax.Array] = None,
+        covariance_matrix: Optional[jax.Array] = None,
+        precision_matrix: Optional[jax.Array] = None,
+    ) -> jax.Array:
         """
         Estimate the Mahalanobis distance measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             The input data point of shape (d, ) if particle, or (n, d) if time series.
-        mu: `chex.Array`, optional
+        mu: `jax.Array`, optional
             The mean data point of shape (d, ) if particle, or (n, d) if time series. If not provided, mu = 0.
-        covariance_matrix: `chex.Array`, optional
+        covariance_matrix: `jax.Array`, optional
             The covariance matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
             covariance_matrix = eye(d).
-        precision_matrix: `chex.Array`, optional
+        precision_matrix: `jax.Array`, optional
             The precision matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
             precision_matrix = eye(d).
 
         Returns
         -------
-        `chex.Array`:
+        `jax.Array`:
             The estimated Mahalanobis distance of shape ().
         """
         if mu is None:
@@ -656,30 +655,30 @@ class SquaredMahalanobisDistance(MahalanobisDistance):
 
     def run(
         self,
-        x: chex.Array,
-        mu: Optional[chex.Array] = None,
-        covariance_matrix: Optional[chex.Array] = None,
-        precision_matrix: Optional[chex.Array] = None,
-    ) -> chex.Array:
+        x: jax.Array,
+        mu: Optional[jax.Array] = None,
+        covariance_matrix: Optional[jax.Array] = None,
+        precision_matrix: Optional[jax.Array] = None,
+    ) -> jax.Array:
         """
          Estimate the Mahalanobis distance measure.
 
          Parameters
          ----------
-        x: `chex.Array`
+        x: `jax.Array`
              The input data point of shape (d, ) if particle, or (n, d) if time series.
-         mu: `chex.Array`, optional
+         mu: `jax.Array`, optional
              The mean data point of shape (d, ) if particle, or (n, d) if time series. If not provided, mu = 0.
-         covariance_matrix: `chex.Array`, optional
+         covariance_matrix: `jax.Array`, optional
              The covariance matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
              covariance_matrix = eye(d).
-         precision_matrix: `chex.Array`, optional
+         precision_matrix: `jax.Array`, optional
              The precision matrix of shape (d, d, ) if particle, or (n, d, d) if time series. If not provided,
              precision_matrix = eye(d).
 
          Returns
          -------
-         `chex.Array`:
+         `jax.Array`:
              The estimated squared Mahalanobis distance of shape ().
         """
         if mu is None:
@@ -804,20 +803,20 @@ class DynamicTimeWarping(DistanceMeasures):
             distance = EuclideanDistance.construct()
         return cls(distance=distance)
 
-    def init_model_matrix(self, x: chex.Array, y: chex.Array) -> chex.Array:
+    def init_model_matrix(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
         Initialize the state for the Dynamic Time Warping distance measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             The input data of shape = (n_x, d).
-        y: `chex.Array`
+        y: `jax.Array`
             The second input data of shape = (n_y, d).
 
         Returns
         -------
-        chex.Array:
+        jax.Array:
             The model matrix for the dynamice time warping measure of shape (n_x + n_y - 1, n_y).
         """
         x = jnp.expand_dims(x, axis=1)
@@ -836,20 +835,20 @@ class DynamicTimeWarping(DistanceMeasures):
             )
         return jnp.stack(rows, axis=1)
 
-    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
+    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
         Estimate the Dynamic Time Warping distance measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             The input data point of shape (d, ) if particle, or (n_x, d) if time series.
-        y: `chex.Array`
+        y: `jax.Array`
             The input data point of shape (d, ) if particle, or (n_y, d) if time series.
 
         Returns
         -------
-        `chex.Array`:
+        `jax.Array`:
             The estimated Dynamic Time Warping distance of shape ().
         """
         assert (
@@ -865,7 +864,7 @@ class DynamicTimeWarping(DistanceMeasures):
         if y.ndim == 1:
             y = jnp.expand_dims(y, axis=0)
 
-        def _body_fn(carry: Sequence, anti_diagonal: chex.Array) -> Any:
+        def _body_fn(carry: Sequence, anti_diagonal: jax.Array) -> Any:
             two_ago, one_ago = carry
 
             diagonal = two_ago[:-1]
@@ -947,20 +946,20 @@ class DiscreteFrechetDistance(DistanceMeasures):
             distance = EuclideanDistance.construct()
         return cls(distance=distance)
 
-    def init_model_matrix(self, x: chex.Array, y: chex.Array) -> chex.Array:
+    def init_model_matrix(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
         Initialize the state for the discrete Frechet distance measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             The input data of shape = (n_x, d).
-        y: `chex.Array`
+        y: `jax.Array`
             The second input data of shape = (n_y, d).
 
         Returns
         -------
-        chex.Array:
+        jax.Array:
             The model matrix for the discrete Frechet distance measure of shape (n_x + n_y - 1, n_y).
         """
         x = jnp.expand_dims(x, axis=1)
@@ -980,20 +979,20 @@ class DiscreteFrechetDistance(DistanceMeasures):
             )
         return jnp.stack(rows, axis=1)
 
-    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
+    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
         Estimate the discrete Frechet distance measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             The input data point of shape (d, ) if particle, or (n_x, d) if time series.
-        y: `chex.Array`
+        y: `jax.Array`
             The input data point of shape (d, ) if particle, or (n_y, d) if time series.
 
         Returns
         -------
-        `chex.Array`:
+        `jax.Array`:
             The estimated Dynamic Time Warping distance of shape ().
         """
         assert (
@@ -1009,7 +1008,7 @@ class DiscreteFrechetDistance(DistanceMeasures):
         if y.ndim == 1:
             y = jnp.expand_dims(y, axis=0)
 
-        def _body_fn(carry: Sequence, anti_diagonal: chex.Array) -> Any:
+        def _body_fn(carry: Sequence, anti_diagonal: jax.Array) -> Any:
             two_ago, one_ago = carry
 
             diagonal = two_ago[:-1]
@@ -1209,15 +1208,15 @@ class SinkhornDistance(DistanceMeasures):
             return_regularized_cost=return_regularized_cost,
         )
 
-    def init_geometry(self, x: chex.Array, y: chex.Array) -> Any:
+    def init_geometry(self, x: jax.Array, y: jax.Array) -> Any:
         """
         Initialize the geometry for the Sinkhorn distance measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             The input data of shape = (n_x, d).
-        y: `chex.Array`
+        y: `jax.Array`
             The second input data of shape = (n_y, d).
 
         Returns
@@ -1241,20 +1240,20 @@ class SinkhornDistance(DistanceMeasures):
         )
         return geometry
 
-    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
+    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
         Estimate the Sinkhorn distance measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             The input data point of shape (d, ) if particle, or (n_x, d) if time series.
-        y: `chex.Array`
+        y: `jax.Array`
             The input data point of shape (d, ) if particle, or (n_y, d) if time series.
 
         Returns
         -------
-        `chex.Array`
+        `jax.Array`
             The estimated Sinkhorn distance of shape ().
         """
         assert (

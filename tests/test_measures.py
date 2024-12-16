@@ -2,13 +2,12 @@ from typing import Dict
 from pathlib import Path
 
 import pytest
-import chex
 import jax
 import numpy as np
 import jax.numpy as jnp
 
-import metrix
-from metrix import DistanceMeasures, StatisticalMeasures
+import metrx
+from metrx import DistanceMeasures, StatisticalMeasures
 
 
 CONFIG = {
@@ -37,46 +36,46 @@ CONFIG = {
         "rotation": 0.0,
     },
 }
-TEST_DIR_PATH = Path(metrix.__file__).parent.parent / "tests"
+TEST_DIR_PATH = Path(metrx.__file__).parent.parent / "tests"
 
 
 def _generate_trajectory(
-    time: chex.Array,
-    amplitude: chex.Array,
-    frequency: chex.Array,
-    offset_x: chex.Array,
-    offset_y: chex.Array,
-    phase_shift: chex.Array,
+    time: jax.Array,
+    amplitude: jax.Array,
+    frequency: jax.Array,
+    offset_x: jax.Array,
+    offset_y: jax.Array,
+    phase_shift: jax.Array,
     angle: float = 0.0,
-) -> chex.Array:
+) -> jax.Array:
     """
     Generate a trajectory given the parameters.
 
     Parameters
     ----------
-    time: chex.Array
+    time: jax.Array
         Time steps as (1, t) array
-    amplitude: chex.Array
+    amplitude: jax.Array
         Amplitude of the trajectory as (b, 1) array
-    frequency: chex.Array
+    frequency: jax.Array
         Frequency of the trajectory as (b, 1) array
-    offset_x: chex.Array
+    offset_x: jax.Array
         Offset in x-direction as (b, 1) array
-    offset_y: chex.Array
+    offset_y: jax.Array
         Offset in y-direction as (b, 1) array
-    phase_shift: chex.Array
+    phase_shift: jax.Array
         Phase shift of the trajectory as (b, 1) array
     angle:
         Rotation angle in radians
 
     Returns
     -------
-    chex.Array
+    jax.Array
         Trajectory as (b, t, 2) array
 
     """
 
-    def _rotate(array: chex.Array) -> chex.Array:
+    def _rotate(array: jax.Array) -> jax.Array:
         rotation_matrix = jnp.array(
             [[jnp.cos(angle), -jnp.sin(angle)], [jnp.sin(angle), jnp.cos(angle)]]
         )
@@ -97,20 +96,20 @@ def _generate_trajectory(
     return _rotate(tau)
 
 
-def get_samples(rng_key: chex.PRNGKey, **kwargs) -> chex.Array:
+def get_samples(rng_key: jax.Array, **kwargs) -> jax.Array:
     """
     Generate batches of trajectory samples from a common base distribution.
 
     Parameters
     ----------
-    rng_key : chex.PRNGKey
+    rng_key : jax.Array
         Random number generator key.
     **kwargs : Dict
         Dictionary of trajectory parameters
 
     Returns
     -------
-    chex.Array
+    jax.Array
         Samples from a specific trajectory distribution.
     """
     time_steps = jnp.linspace(0.0, 1, kwargs["time_steps"])[jnp.newaxis, :]

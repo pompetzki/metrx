@@ -1,4 +1,3 @@
-import chex
 import functools
 import jax
 import jax.numpy as jnp
@@ -7,7 +6,7 @@ from typing import Sequence
 
 
 @functools.partial(jax.jit, static_argnames=["reg"])
-def fit_gaussian2data(x: chex.Array, reg: float = 1e-5) -> Sequence[chex.Array]:
+def fit_gaussian2data(x: jax.Array, reg: float = 1e-5) -> Sequence[jax.Array]:
     """
     Fit a Gaussian model to each time step n given the samples from x as array of shape (b, n, d).
 

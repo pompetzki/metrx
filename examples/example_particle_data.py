@@ -1,27 +1,26 @@
-import chex
 import jax
 import jax.numpy as jnp
 import matplotlib
 import matplotlib.pyplot as plt
 
 from typing import Dict, Sequence
-from metrix import DistanceMeasures, StatisticalMeasures
+from metrx import DistanceMeasures, StatisticalMeasures
 
 
-def get_samples(rng_key: chex.PRNGKey, **kwargs) -> chex.Array:
+def get_samples(rng_key: jax.Array, **kwargs) -> jax.Array:
     """
     Generate batches of particles sampled from a multivariate normal distribution.
 
     Parameters
     ----------
-    rng_key : chex.PRNGKey
+    rng_key : jax.Array
         Random number generator key.
     **kwargs : Dict
         Dictionary of parameters
 
     Returns
     -------
-    chex.Array
+    jax.Array
         Samples from a specific multivariate normal distribution.
     """
     return jax.random.multivariate_normal(

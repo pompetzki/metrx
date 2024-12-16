@@ -9,5 +9,5 @@ authors:
     given-names: Firas
   - family-names: Peters
     given-names: Jan
-title: "MetriX: A JAX-Based Collection of Similarity and Statistical Measures for Accelerated Data Analysis."
+title: "MetrX: A JAX-Based Collection of Similarity and Statistical Measures for Accelerated Data Analysis."
 date-released: 2024-11-26

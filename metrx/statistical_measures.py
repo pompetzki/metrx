@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Sequence, Optional, Any, Dict, Tuple, Union
 
-import chex
 import distrax
 import jax
 import jax.numpy as jnp
@@ -11,8 +10,8 @@ from ott.solvers.linear import sinkhorn
 from ott.problems.linear import linear_problem
 from ott.geometry.costs import CostFn
 
-from metrix.distance_measures import DistanceMeasures
-from metrix.utils import fit_gaussian2data
+from metrx.distance_measures import DistanceMeasures
+from metrx.utils import fit_gaussian2data
 
 
 @struct.dataclass
@@ -104,7 +103,7 @@ class StatisticalMeasures(ABC):
         """
         return cls.construct(*args, **kwargs)
 
-    def __call__(self, *args: Any, **kwargs: Any) -> chex.Array:
+    def __call__(self, *args: Any, **kwargs: Any) -> jax.Array:
         """
         Call the statistical measure.
 
@@ -117,13 +116,13 @@ class StatisticalMeasures(ABC):
 
         Returns
         -------
-        `chex.Array`
+        `jax.Array`
             The estimated statistical measure.
         """
         return self.run(*args, **kwargs)
 
     @abstractmethod
-    def run(self, *args: Any, **kwargs: Any) -> chex.Array:
+    def run(self, *args: Any, **kwargs: Any) -> jax.Array:
         """
         Estimate the statistical measure.
 
@@ -136,7 +135,7 @@ class StatisticalMeasures(ABC):
 
         Returns
         -------
-        `chex.Array`
+        `jax.Array`
             The estimated statistical measure.
         """
         raise NotImplementedError
@@ -240,22 +239,22 @@ class RelativeEntropy(StatisticalMeasures):
             reverse=reverse, reg=reg, mean=mean, median=median, total_sum=total_sum
         )
 
-    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
+    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
         Run the relative entropy divergence measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             Empirical data of shape (b_x, d) if particles are considered. If time series data is considered, the shape
             is (b_x, n, d).
-        y: `chex.Array`
+        y: `jax.Array`
             Empirical data of shape (b_y, d) if particles are considered. If time series data is considered, the shape
             is (b_x, n, d).
 
         Returns
         -------
-        chex.Array
+        jax.Array
             The relative entropy divergence measure of shape (1, ).
         """
         assert (
@@ -358,22 +357,22 @@ class FrechetInceptionDistance(StatisticalMeasures):
             total_sum = True
         return cls(alpha=alpha, reg=reg, mean=mean, median=median, total_sum=total_sum)
 
-    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
+    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
         Run the total Frechet Inception Distance measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             Empirical data of shape (b_x, d) if particles are considered. If time series data is considered, the shape
             is (b_x, n, d).
-        y: `chex.Array`
+        y: `jax.Array`
             Empirical data of shape (b_y, d) if particles are considered. If time series data is considered, the shape
             is (b_x, n, d).
 
         Returns
         -------
-        `chex.Array`
+        `jax.Array`
             The Frechet Inception Distance measure of shape (1, ).
         """
         assert (
@@ -499,7 +498,7 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
 
         return cls(distance=distance_measure, bandwidths=bandwidths, unbiased=unbiased)
 
-    def _mmd_kernel(self, x: chex.Array, y: chex.Array) -> chex.Array:
+    def _mmd_kernel(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
         Compute the Maximum Mean Discrepancy kernel between two time series data. Depending on the selected distance
         the two time series have to be of the same length (N_x = N_y), .e.g., the squared Euclidean distance. However,
@@ -507,21 +506,21 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             Empirical data of shape (B_x, N_x, D).
-        y: `chex.Array`
+        y: `jax.Array`
             Empirical data of shape (B_y, N_y, D).
 
         Returns
         -------
-        `chex.Array`
+        `jax.Array`
             The Maximum Mean Discrepancy kernel of shape (B_x, B_y).
         """
         distance_matrix = jax.vmap(
             jax.vmap(self.distance, in_axes=(None, 0)), in_axes=(0, None)
         )(x, y)
 
-        def rbf_kernel(kernelized_dist: chex.Array, bandwidth: float) -> Any:
+        def rbf_kernel(kernelized_dist: jax.Array, bandwidth: float) -> Any:
             return kernelized_dist + jnp.exp(-0.5 / bandwidth * distance_matrix), None
 
         kernelized_distance_matrix = jnp.zeros((x.shape[0], y.shape[0]))
@@ -530,22 +529,22 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         )
         return kernelized_distance_matrix
 
-    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
+    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
         Run the Maximum Mean Discrepancy measure.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             Empirical data of shape (b_x, d) if particles are considered. If time series data is considered, the shape
             is (b_x, n_x, d).
-        y: `chex.Array`
+        y: `jax.Array`
             Empirical data of shape (b_y, d) if particles are considered. If time series data is considered, the shape
             is (b_x, n_y, d).
 
         Returns
         -------
-        `chex.Array`
+        `jax.Array`
             The Maximum Mean Discrepancy measure of shape ().
         """
         assert x.shape[-1] == y.shape[-1], (
@@ -651,22 +650,22 @@ class WassersteinDistance(StatisticalMeasures):
     def distance_measure(self):
         return self.cost_fn.distance_measure
 
-    def run(self, x: chex.Array, y: chex.Array) -> chex.Array:
+    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
         Run the 1-Wasserstein distance.
 
         Parameters
         ----------
-        x: `chex.Array`
+        x: `jax.Array`
             Empirical data of shape (b_x, d) if particles are considered. If time series data is considered, the shape
             is (b_x, n_x, d).
-        y: `chex.Array`
+        y: `jax.Array`
             Empirical data of shape (b_y, d) if particles are considered. If time series data is considered, the shape
             is (b_x, n_y, d).
 
         Returns
         -------
-        `chex.Array`
+        `jax.Array`
             The Maximum Mean Discrepancy measure of shape ().
         """
         geom = pointcloud.PointCloud(x, y, cost_fn=self.cost_fn, epsilon=self.epsilon)
