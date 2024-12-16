@@ -11,6 +11,12 @@ scalability and accelerator support, it includes high-performance, parallelizabl
 used metrics.
 
 ## Installation 
+You have the choice to install the latest release via PyPI by running
+```
+pip install metrx
+```
+or you do an editable installation by cloning this repository and then running
+
 ```bash
 pip install -e .
 ```
