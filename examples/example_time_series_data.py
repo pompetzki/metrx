@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 from typing import Dict, Sequence
 from metrx import DistanceMeasures, StatisticalMeasures
+from metrx.statistical_measures import GromovWassersteinDistance
 
 
 def _generate_trajectory(
@@ -196,7 +197,12 @@ def main(**kwargs: Dict) -> None:
                         jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
                     )(x, y)
                 else:
-                    costs = _measure(x, y)
+                    if isinstance(_measure, GromovWassersteinDistance):
+                        costs = jax.vmap(
+                            jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
+                        )(x, y)
+                    else:
+                        costs = _measure(x, y)
                 cost_dict.update(
                     {
                         f"{_name}": {

@@ -7,6 +7,8 @@ authors:
     given-names: Theo
   - family-names: Al-Hafez
     given-names: Firas
+  - family-names: Le
+    given-names: An T.
   - family-names: Peters
     given-names: Jan
 title: "MetrX: A JAX-Based Collection of Similarity and Statistical Measures for Accelerated Data Analysis."

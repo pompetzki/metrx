@@ -38,6 +38,7 @@ The following metrics are currently implemented.
 - [Frechet Inception Distance](https://github.com/pompetzki/metrx/blob/main/metrx/statistical_measures.py#L295)
 - [Maximum Mean Discrepancy](https://github.com/pompetzki/metrx/blob/main/metrx/statistical_measures.py#L425)
 - [Wassersteim Distance](https://github.com/pompetzki/metrx/blob/main/metrx/statistical_measures.py#L605)
+- [Gromov-Wassersteim Distance](https://github.com/pompetzki/metrx/blob/main/metrx/statistical_measures.py#L690)
 
 
 ## Examples
@@ -55,7 +56,7 @@ python examples/example_time_series_data.py
 If you use this libarary in your work, please consider citing it as follows:
 ```
 @software{metrx2024github,
-  author = {Pompetzki, Kay and Gruner, Theo and Al-Hafez, Firas, and Peters, Jan},
+  author = {Pompetzki, Kay and Gruner, Theo and Al-Hafez, Firas, and Le, An T., and Peters, Jan},
   title = {MetrX: A JAX-Based Collection of Similarity and Statistical Measures for Accelerated Data Analysis.},
   url = {https://github.com/pompetzki/metrx},
   year = {2024},

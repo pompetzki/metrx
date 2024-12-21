@@ -6,11 +6,14 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 from ott.geometry import pointcloud
-from ott.solvers.linear import sinkhorn
+from ott.solvers.linear import sinkhorn, sinkhorn_lr
 from ott.problems.linear import linear_problem
+from ott.problems.quadratic import quadratic_problem
+from ott.solvers.quadratic import gromov_wasserstein, gromov_wasserstein_lr
 from ott.geometry.costs import CostFn
+from ott.geometry import pointcloud
 
-from metrx.distance_measures import DistanceMeasures
+from metrx.distance_measures import DistanceMeasures, SquaredEuclideanDistance, MinkowskiDistance
 from metrx.utils import fit_gaussian2data
 
 
@@ -677,3 +680,145 @@ class WassersteinDistance(StatisticalMeasures):
             return out.reg_ot_cost
 
         return jnp.sum(out.matrix * out.geom.cost_matrix)
+
+# --------------------------------------------------------------------------------------------------------------------
+# ------------------------------------------------- Gromov-Wasserstein Distance --------------------------------------
+# --------------------------------------------------------------------------------------------------------------------
+
+
+@struct.dataclass
+class GromovWassersteinDistance(StatisticalMeasures):
+    """
+    Similarity measure between data points using the Gromov-Wasserstein distance measure [1, 2]. The Gromov-Wasserstein
+    distance is a measure of similarity between two graphs. Here, we consider each point as a weighted particle.
+
+    The algorithm follows a linear programming approach to find the optimal transport plan between the two sequences.
+    We used the implementation of the Gromov-Wasserstein distance from [3].
+
+    Parameters
+    ----------
+    solver: `Any`, optional, default = None.
+        The solver to use for the Gromov-Wasserstein distance. If None, the Gromov-Wasserstein solver is used.
+    cost_fn: `CostFn`, optional, default = None.
+        The cost function to use for the Gromov-Wasserstein distance. If None, the base cost function is used.
+    epsilon: `float`, optional, default = None.
+        The regularization parameter for the Gromov-Wasserstein distance. If None, the default value is used.
+    return_regularized_cost: `bool`, optional, default = False.
+        If True, the regularized cost is returned. If False, the unregularized cost is returned.
+
+    Returns
+    -------
+    `GromovWassersteinDistance`
+        An instance of the Gromov-Wasserstein distance measure.
+
+    References
+    ----------
+    [1] M. Cuturi, S. Bonneel, and A. Doucet. Gromov-Wasserstein Averaging of Kernel and Distance Matrices. 2017.
+        Available: https://arxiv.org/abs/1706.03348
+    [2] G. Peyré and M. Cuturi. Computational Optimal Transport. 2019.
+        Available: https://arxiv.org/abs/1803.00567
+    [3] M. Cuturi. Optimal Transport Tools (OTT): A JAX Toolbox for all things Wasserstein, arXiv, 2022.
+        Available: arXiv preprint arXiv:2201.12324
+        Github:
+        Docs: https://ott-jax.readthedocs.io/en/latest/
+    """
+
+    solver: Optional[Any] = struct.field(default=None, pytree_node=False)
+    cost_fn: OTTCostWrapper = struct.field(default=None, pytree_node=False)
+    epsilon: Optional[float] = struct.field(default=None, pytree_node=False)
+    return_regularized_cost: bool = struct.field(default=False, pytree_node=False)
+
+    @classmethod
+    def construct(
+        cls,
+        distance_measure: Union[DistanceMeasures, str] = "EuclideanDistance",
+        distance_kwargs: Dict = {},
+        sinkhorn_params: Dict = {},
+        gromov_params: Dict = {},
+        low_rank: bool = False,
+        epsilon: Optional[float] = None,
+        return_regularized_cost: bool = False,
+    ) -> StatisticalMeasures:
+        """
+        Construct the Gromov-Wasserstein distance measure.
+
+        Parameters
+        ----------
+        epsilon: `float`, optional, default = None.
+            The regularization parameter for the Gromov-Wasserstein distance.
+        cost_fn: `CostFn`, optional, default = None.
+            The cost function to use for the Gromov-Wasserstein distance.
+        return_regularized_cost: `bool`, optional, default = None.
+            If True, the regularized cost is returned. If False, the unregularized cost is returned.
+
+        Returns
+        -------
+        `GromovWassersteinDistance`
+            An instance of the Gromov-Wasserstein distance measure.
+        """
+        if isinstance(distance_measure, str):
+            distance_measure = DistanceMeasures.create_instance(
+                distance_measure, **distance_kwargs
+            )
+
+        # Build cost function wrapper for the ott-jax library
+        cost_fn = OTTCostWrapper.construct(distance_measure)
+        rank = gromov_params.pop("rank", 2)
+        sinkhorn_solver = sinkhorn.Sinkhorn(**sinkhorn_params)
+        solver = gromov_wasserstein_lr.LRGromovWasserstein(rank, **gromov_params) if low_rank else gromov_wasserstein.GromovWasserstein(sinkhorn_solver, **gromov_params)
+
+        return cls(
+            solver=solver,
+            epsilon=epsilon,
+            cost_fn=cost_fn,
+            return_regularized_cost=return_regularized_cost,
+        )
+
+    def init_geometry(self, x: jax.Array, y: jax.Array) -> Any:
+        """
+        Initialize the geometry for the Gromov-Wasserstein distance measure.
+
+        Parameters
+        ----------
+        x: `jax.Array`
+            The input data of shape = (n_x, d).
+        y: `jax.Array`
+            The second input data of shape = (n_y, d).
+
+        Returns
+        -------
+        `Any`
+            The geometry of the Gromov-Wasserstein distance measure.
+        """
+        # Add time to given arrays based on a linear interpolation
+        n_x = x.shape[0]
+        x_extended = jnp.concatenate(
+            (x, jnp.linspace(0, 1, n_x)[:, jnp.newaxis]), axis=-1
+        )
+        n_y = y.shape[0]
+        y_extended = jnp.concatenate(
+            (y, jnp.linspace(0, 1, n_y)[:, jnp.newaxis]), axis=-1
+        )
+
+        # Generate and return a geometry for a Quadratic OT problem
+        geom_xx = pointcloud.PointCloud(
+            x_extended, cost_fn=self.cost_fn, epsilon=self.epsilon
+        )
+        geom_yy = pointcloud.PointCloud(
+            y_extended, cost_fn=self.cost_fn, epsilon=self.epsilon
+        )
+        return geom_xx, geom_yy
+    
+    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
+
+        if x.ndim == 1:
+            x = jnp.expand_dims(x, axis=0)
+        if y.ndim == 1:
+            y = jnp.expand_dims(y, axis=0)
+
+        geom_xx, geom_yy = self.init_geometry(x, y)
+        ot_problem = quadratic_problem.QuadraticProblem(geom_xx, geom_yy)
+        solution = self.solver(ot_problem)
+        if self.return_regularized_cost:
+            return solution.reg_ot_cost
+        return jnp.sum(solution.matrix * solution.geom.cost_matrix)

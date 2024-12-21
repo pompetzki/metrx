@@ -51,7 +51,7 @@ def visualize(xy: Sequence, costs: Dict) -> None:
     matplotlib.use("TkAgg")
 
     # Create figure
-    fig, ax = plt.subplots(2,1, figsize=(12, 4))
+    fig, ax = plt.subplots(2, 1, figsize=(12, 8))
     ax.flatten()
 
     # Visualize trajectories

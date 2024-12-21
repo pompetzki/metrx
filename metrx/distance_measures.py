@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from abc import ABC, abstractmethod
 from flax import struct
 from ott.geometry import pointcloud
-from ott.solvers.linear import sinkhorn
+from ott.solvers.linear import sinkhorn, sinkhorn_lr
 from ott.problems.linear import linear_problem
 from ott.geometry.costs import CostFn
 from typing import Sequence, Optional, Any, Dict
@@ -1173,6 +1173,7 @@ class SinkhornDistance(DistanceMeasures):
     cost_fn: Optional[CostFn] = struct.field(default=None, pytree_node=False)
     epsilon: Optional[float] = struct.field(default=None, pytree_node=False)
     return_regularized_cost: bool = struct.field(default=False, pytree_node=False)
+    low_rank: bool = struct.field(default=False, pytree_node=False)
 
     @classmethod
     def construct(
@@ -1180,6 +1181,8 @@ class SinkhornDistance(DistanceMeasures):
         epsilon: Optional[float] = None,
         cost_fn: Optional[CostFn] = None,
         return_regularized_cost: bool = False,
+        low_rank: bool = False,
+        sinkhorn_params: Optional[Dict[str, Any]] = {},
     ) -> "SinkhornDistance":
         """
         Construct the Sinkhorn distance measure.
@@ -1200,9 +1203,11 @@ class SinkhornDistance(DistanceMeasures):
         """
         if cost_fn is None:
             cost_fn = OTTCostWrapper.construct()
+        rank = sinkhorn_params.pop("rank", 2)
+        solver = sinkhorn_lr.LRSinkhorn(rank=rank, **sinkhorn_params) if low_rank else sinkhorn.Sinkhorn(**sinkhorn_params)
 
         return cls(
-            solver=sinkhorn.Sinkhorn(),
+            solver=solver,
             epsilon=epsilon,
             cost_fn=cost_fn,
             return_regularized_cost=return_regularized_cost,
@@ -1225,11 +1230,11 @@ class SinkhornDistance(DistanceMeasures):
             The geometry of the Sinkhorn distance measure.
         """
         # Add time to given arrays based on a linear interpolation
-        n_x, _ = x.shape
+        n_x = x.shape[0]
         x_extended = jnp.concatenate(
             (x, jnp.linspace(0, 1, n_x)[:, jnp.newaxis]), axis=-1
         )
-        n_y, _ = y.shape
+        n_y = y.shape[0]
         y_extended = jnp.concatenate(
             (y, jnp.linspace(0, 1, n_y)[:, jnp.newaxis]), axis=-1
         )
