@@ -197,12 +197,7 @@ def main(**kwargs: Dict) -> None:
                         jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
                     )(x, y)
                 else:
-                    if isinstance(_measure, GromovWassersteinDistance):
-                        costs = jax.vmap(
-                            jax.vmap(_measure, in_axes=(None, 0)), in_axes=(0, None)
-                        )(x, y)
-                    else:
-                        costs = _measure(x, y)
+                    costs = _measure(x, y)
                 cost_dict.update(
                     {
                         f"{_name}": {

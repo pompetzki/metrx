@@ -612,6 +612,8 @@ class WassersteinDistance(StatisticalMeasures):
 
     Parameters
     ----------
+    solver: `Any`, optional, default = None.
+        The solver to use for the Gromov-Wasserstein distance. If None, the Gromov-Wasserstein solver is used.
     distance: `DistanceMeasures`, default = SquaredEuclideanDistance
         A distance measure to compute the distance between the two time series data.
     distance_kwargs: `Dict`, containing the configurations to intitialize the `DistanceMeasures`, if `DistanceMeasurs` is a str.
@@ -626,9 +628,11 @@ class WassersteinDistance(StatisticalMeasures):
         An instance of the Wasserstein distance measure
     """
 
-    cost_fn: OTTCostWrapper = struct.field(pytree_node=False)
+    solver: Optional[Any] = struct.field(default=None, pytree_node=False)
+    cost_fn: OTTCostWrapper = struct.field(default=None, pytree_node=False)
     epsilon: Optional[float] = struct.field(default=None, pytree_node=False)
     return_regularized_cost: bool = struct.field(default=False, pytree_node=False)
+    low_rank: bool = struct.field(default=False, pytree_node=False)
 
     @classmethod
     def construct(
@@ -637,6 +641,8 @@ class WassersteinDistance(StatisticalMeasures):
         distance_kwargs: Dict = {},
         epsilon: Optional[float] = None,
         return_regularized_cost: bool = False,
+        low_rank: bool = False,
+        sinkhorn_params: Optional[Dict[str, Any]] = {},
     ) -> StatisticalMeasures:
 
         if isinstance(distance_measure, str):
@@ -646,8 +652,13 @@ class WassersteinDistance(StatisticalMeasures):
 
         # Build cost function wrapper for the ott-jax library
         cost_fn = OTTCostWrapper.construct(distance_measure)
+        rank = sinkhorn_params.pop("rank", 2)
+        if low_rank:
+            solver = sinkhorn_lr.LRSinkhorn(rank=rank, **sinkhorn_params)
+        else:
+            solver = sinkhorn.Sinkhorn(**sinkhorn_params)
 
-        return cls(cost_fn, epsilon, return_regularized_cost)
+        return cls(solver, cost_fn, epsilon, return_regularized_cost)
 
     @property
     def distance_measure(self):
@@ -669,12 +680,11 @@ class WassersteinDistance(StatisticalMeasures):
         Returns
         -------
         `jax.Array`
-            The Maximum Mean Discrepancy measure of shape ().
+            The 1-Wasserstein distance of shape ().
         """
         geom = pointcloud.PointCloud(x, y, cost_fn=self.cost_fn, epsilon=self.epsilon)
         ot_prob = linear_problem.LinearProblem(geom)
-        solver = sinkhorn.Sinkhorn()
-        out = solver(ot_prob)
+        out = self.solver(ot_prob)
 
         if self.return_regularized_cost:
             return out.reg_ot_cost
@@ -764,8 +774,11 @@ class GromovWassersteinDistance(StatisticalMeasures):
         # Build cost function wrapper for the ott-jax library
         cost_fn = OTTCostWrapper.construct(distance_measure)
         rank = gromov_params.pop("rank", 2)
-        sinkhorn_solver = sinkhorn.Sinkhorn(**sinkhorn_params)
-        solver = gromov_wasserstein_lr.LRGromovWasserstein(rank, **gromov_params) if low_rank else gromov_wasserstein.GromovWasserstein(sinkhorn_solver, **gromov_params)
+        if low_rank:
+            solver = gromov_wasserstein_lr.LRGromovWasserstein(rank, **gromov_params)
+        else:
+            sinkhorn_solver = sinkhorn.Sinkhorn(**sinkhorn_params)
+            solver = gromov_wasserstein.GromovWasserstein(sinkhorn_solver, **gromov_params)
 
         return cls(
             solver=solver,
@@ -774,50 +787,30 @@ class GromovWassersteinDistance(StatisticalMeasures):
             return_regularized_cost=return_regularized_cost,
         )
 
-    def init_geometry(self, x: jax.Array, y: jax.Array) -> Any:
+    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """
-        Initialize the geometry for the Gromov-Wasserstein distance measure.
+        Run the Gromov-Wasserstein distance measure.
 
         Parameters
         ----------
         x: `jax.Array`
-            The input data of shape = (n_x, d).
+            Empirical data of shape (b_x, d_x) if particles are considered. If time series data is considered, the shape
+            is (b_x, n_x, d_x).
         y: `jax.Array`
-            The second input data of shape = (n_y, d).
+            Empirical data of shape (b_y, d_y) if particles are considered. If time series data is considered, the shape
+            is (b_x, n_y, d_y).
 
         Returns
         -------
-        `Any`
-            The geometry of the Gromov-Wasserstein distance measure.
+        `jax.Array`
+            The Gromov-Wasserstein distance measure of shape ().
         """
-        # Add time to given arrays based on a linear interpolation
-        n_x = x.shape[0]
-        x_extended = jnp.concatenate(
-            (x, jnp.linspace(0, 1, n_x)[:, jnp.newaxis]), axis=-1
-        )
-        n_y = y.shape[0]
-        y_extended = jnp.concatenate(
-            (y, jnp.linspace(0, 1, n_y)[:, jnp.newaxis]), axis=-1
-        )
 
-        # Generate and return a geometry for a Quadratic OT problem
-        geom_xx = pointcloud.PointCloud(
-            x_extended, cost_fn=self.cost_fn, epsilon=self.epsilon
-        )
-        geom_yy = pointcloud.PointCloud(
-            y_extended, cost_fn=self.cost_fn, epsilon=self.epsilon
-        )
-        return geom_xx, geom_yy
-    
-    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
+        geom_xx = pointcloud.PointCloud(x, cost_fn=self.cost_fn, epsilon=self.epsilon)
+        geom_yy = pointcloud.PointCloud(y, cost_fn=self.cost_fn, epsilon=self.epsilon)
 
-        if x.ndim == 1:
-            x = jnp.expand_dims(x, axis=0)
-        if y.ndim == 1:
-            y = jnp.expand_dims(y, axis=0)
-
-        geom_xx, geom_yy = self.init_geometry(x, y)
         ot_problem = quadratic_problem.QuadraticProblem(geom_xx, geom_yy)
+
         solution = self.solver(ot_problem)
         if self.return_regularized_cost:
             return solution.reg_ot_cost
