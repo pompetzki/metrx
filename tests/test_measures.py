@@ -174,7 +174,7 @@ def test_distances(dist_type: DistanceMeasures | StatisticalMeasures, name: str)
     rng_key, rng_key_x, rng_key_y = jax.random.split(rng_key, num=3)
     x = get_samples(rng_key_x, **CONFIG["x"])
     y = get_samples(rng_key_y, **CONFIG["y"])
-    x_1D, y_1D = jnp.squeeze(x[:, 1, 1]), jnp.squeeze(y[:, 1, 1])
+    x_1D, y_1D = jnp.squeeze(x[:, 1, :]), jnp.squeeze(y[:, 1, :])
 
     _measure = dist_type.create_instance(name)
     inputs = (x_1D, y_1D) if name == "CosineDistance" else (x, y)
@@ -196,6 +196,12 @@ def test_distances(dist_type: DistanceMeasures | StatisticalMeasures, name: str)
         std=np.std(costs_jitted),
         median=np.median(costs_jitted),
     )
+    # np.savez(
+    #     TEST_DIR_PATH / f"test_datasets/{name}",
+    #     mean=data["mean"],
+    #     std=data["std"],
+    #     median=data["median"],
+    # )
 
     # load the results
     loaded = np.load(TEST_DIR_PATH / f"test_datasets/{name}.npz")
