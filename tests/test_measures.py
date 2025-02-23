@@ -37,6 +37,7 @@ CONFIG = {
     },
 }
 TEST_DIR_PATH = Path(metrx.__file__).parent.parent / "tests"
+RECREATE_DATA = False
 
 
 def _generate_trajectory(
@@ -169,11 +170,16 @@ def test_distances(dist_type: DistanceMeasures | StatisticalMeasures, name: str)
     jax.config.update("jax_platform_name", "cpu")
     print(f"Jax backend device: {jax.default_backend()} \n")
 
-    rng_key = jax.random.PRNGKey(CONFIG["seed"])
+    if RECREATE_DATA:
+        rng_key = jax.random.PRNGKey(CONFIG["seed"])
 
-    rng_key, rng_key_x, rng_key_y = jax.random.split(rng_key, num=3)
-    x = get_samples(rng_key_x, **CONFIG["x"])
-    y = get_samples(rng_key_y, **CONFIG["y"])
+        rng_key, rng_key_x, rng_key_y = jax.random.split(rng_key, num=3)
+        x = get_samples(rng_key_x, **CONFIG["x"])
+        y = get_samples(rng_key_y, **CONFIG["y"])
+        np.savez(TEST_DIR_PATH / "test_datasets/data", x=x, y=y)
+    else:
+        data = np.load(TEST_DIR_PATH / "test_datasets/data.npz")
+        x, y = data["x"], data["y"]
     x_1D, y_1D = jnp.squeeze(x[:, 1, :]), jnp.squeeze(y[:, 1, :])
 
     _measure = dist_type.create_instance(name)
