@@ -3,6 +3,7 @@
 ![continous integration](https://github.com/pompetzki/metrx/actions/workflows/continuous_integration.yml/badge.svg?branch=main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI](https://img.shields.io/pypi/v/metrx)](https://pypi.org/project/metrx/)
+[![DOI](https://zenodo.org/badge/836293491.svg)](https://doi.org/10.5281/zenodo.14905026)
 
 
 
