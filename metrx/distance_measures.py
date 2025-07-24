@@ -230,7 +230,7 @@ class MinkowskiDistance(DistanceMeasures):
             total_sum = True
         return cls(p=p, mean=mean, median=median, total_sum=total_sum)
 
-    def run(self, x: jax.Array, y: Optional[jax.Array] = None) -> jax.Array:
+    def run(self, x: jax.Array, y: Optional[jax.Array] = None, **ignore) -> jax.Array:
         """
         Estimate the Minkowski distance measure.
 
@@ -324,7 +324,7 @@ class EuclideanDistance(DistanceMeasures):
             total_sum = True
         return cls(mean=mean, median=median, total_sum=total_sum)
 
-    def run(self, x: jax.Array, y: Optional[jax.Array] = None) -> jax.Array:
+    def run(self, x: jax.Array, y: Optional[jax.Array] = None, **ignore) -> jax.Array:
         """
         Estimate the Euclidean distance measure.
 
@@ -389,7 +389,7 @@ class SquaredEuclideanDistance(EuclideanDistance):
         An instance of the squared Euclidean distance measure.
     """
 
-    def run(self, x: jax.Array, y: Optional[jax.Array] = None) -> jax.Array:
+    def run(self, x: jax.Array, y: Optional[jax.Array] = None, **ignore) -> jax.Array:
         """
         Estimate the squared Euclidean distance measure.
 
@@ -441,7 +441,7 @@ class CosineDistance(DistanceMeasures):
     def construct(cls, eps: float = 1e-8) -> "CosineDistance":
         return cls(eps)
 
-    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
+    def run(self, x: jax.Array, y: jax.Array, **ignore) -> jax.Array:
         """
         Estimate the Cosine distance measure d = 1 - 'cosine similarity'.
         Note that the cosine distance is only a quasi-metric.
@@ -542,6 +542,7 @@ class MahalanobisDistance(DistanceMeasures):
         mu: Optional[jax.Array] = None,
         covariance_matrix: Optional[jax.Array] = None,
         precision_matrix: Optional[jax.Array] = None,
+        **ignore,
     ) -> jax.Array:
         """
         Estimate the Mahalanobis distance measure.
@@ -659,6 +660,7 @@ class SquaredMahalanobisDistance(MahalanobisDistance):
         mu: Optional[jax.Array] = None,
         covariance_matrix: Optional[jax.Array] = None,
         precision_matrix: Optional[jax.Array] = None,
+        **ignore,
     ) -> jax.Array:
         """
          Estimate the Mahalanobis distance measure.
@@ -803,7 +805,9 @@ class DynamicTimeWarping(DistanceMeasures):
             distance = EuclideanDistance.construct()
         return cls(distance=distance)
 
-    def init_model_matrix(self, x: jax.Array, y: jax.Array) -> jax.Array:
+    def init_model_matrix(
+        self, x: jax.Array, y: jax.Array, x_mask: jax.Array, y_mask: jax.Array
+    ) -> jax.Array:
         """
         Initialize the state for the Dynamic Time Warping distance measure.
 
@@ -819,11 +823,18 @@ class DynamicTimeWarping(DistanceMeasures):
         jax.Array:
             The model matrix for the dynamice time warping measure of shape (n_x + n_y - 1, n_y).
         """
-        x = jnp.expand_dims(x, axis=1)
-        y = jnp.expand_dims(y, axis=1)
+        x = jnp.expand_dims(x, axis=1)  # shape (n_x, 1, d)
+        y = jnp.expand_dims(y, axis=1)  # shape (n_y, 1, d)
+
         distance_matrix = jax.vmap(
-            jax.vmap(self.distance, in_axes=(0, None)), in_axes=(None, 0)
-        )(x, y)
+            jax.vmap(self.distance, in_axes=(None, 0)), in_axes=(0, None)
+        )(
+            x, y
+        )  # shape (n_x, n_y)
+
+        # Apply mask: if either x[i] or y[j] is masked, set distance to inf
+        mask_matrix = jnp.outer(x_mask, y_mask)
+        distance_matrix = jnp.where(mask_matrix, distance_matrix, jnp.inf)
 
         h, _ = distance_matrix.shape
         rows = []
@@ -835,7 +846,14 @@ class DynamicTimeWarping(DistanceMeasures):
             )
         return jnp.stack(rows, axis=1)
 
-    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
+    def run(
+        self,
+        x: jax.Array,
+        y: jax.Array,
+        x_mask: jax.Array | None = None,
+        y_mask: jax.Array | None = None,
+        **ignore,
+    ) -> jax.Array:
         """
         Estimate the Dynamic Time Warping distance measure.
 
@@ -845,6 +863,10 @@ class DynamicTimeWarping(DistanceMeasures):
             The input data point of shape (d, ) if particle, or (n_x, d) if time series.
         y: `jax.Array`
             The input data point of shape (d, ) if particle, or (n_y, d) if time series.
+        x_mask: `jax.Array`, optional, default = None
+            Padding mask of shape (n_x,) denoting truncation of time series x
+        y_mask: `jax.Array`, optional, default = None
+            Padding mask of shape (n_y,) denoting truncation of time series y
 
         Returns
         -------
@@ -864,6 +886,12 @@ class DynamicTimeWarping(DistanceMeasures):
         if y.ndim == 1:
             y = jnp.expand_dims(y, axis=0)
 
+        if x_mask is None:
+            x_mask = jnp.ones(x.shape[0], dtype=bool)
+
+        if y_mask is None:
+            y_mask = jnp.ones(y.shape[0], dtype=bool)
+
         def _body_fn(carry: Sequence, anti_diagonal: jax.Array) -> Any:
             two_ago, one_ago = carry
 
@@ -877,7 +905,7 @@ class DynamicTimeWarping(DistanceMeasures):
 
             return (one_ago, next_row), next_row
 
-        model_matrix = self.init_model_matrix(x, y)
+        model_matrix = self.init_model_matrix(x, y, x_mask, y_mask)
 
         init = (
             jnp.pad(model_matrix[0], (1, 0), constant_values=jnp.inf),
@@ -885,7 +913,7 @@ class DynamicTimeWarping(DistanceMeasures):
                 model_matrix[1] + model_matrix[0, 0], (1, 0), constant_values=jnp.inf
             ),
         )
-        carry, ys = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
+        carry, _ = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
         return carry[1][-1]
 
 
@@ -946,7 +974,9 @@ class DiscreteFrechetDistance(DistanceMeasures):
             distance = EuclideanDistance.construct()
         return cls(distance=distance)
 
-    def init_model_matrix(self, x: jax.Array, y: jax.Array) -> jax.Array:
+    def init_model_matrix(
+        self, x: jax.Array, y: jax.Array, x_mask, y_mask
+    ) -> jax.Array:
         """
         Initialize the state for the discrete Frechet distance measure.
 
@@ -962,14 +992,21 @@ class DiscreteFrechetDistance(DistanceMeasures):
         jax.Array:
             The model matrix for the discrete Frechet distance measure of shape (n_x + n_y - 1, n_y).
         """
+
         x = jnp.expand_dims(x, axis=1)
         y = jnp.expand_dims(y, axis=1)
+
         distance_matrix = jax.vmap(
-            jax.vmap(self.distance, in_axes=(0, None)), in_axes=(None, 0)
-        )(x, y)
+            jax.vmap(self.distance, in_axes=(None, 0)), in_axes=(0, None)
+        )(
+            x, y
+        )  # shape (n_x, n_y)
+
+        # Apply mask: inf where either x or y is masked
+        mask_matrix = jnp.outer(x_mask, y_mask)
+        distance_matrix = jnp.where(mask_matrix, distance_matrix, jnp.inf)
 
         h, _ = distance_matrix.shape
-
         rows = []
         for row in range(h):
             rows.append(
@@ -979,7 +1016,14 @@ class DiscreteFrechetDistance(DistanceMeasures):
             )
         return jnp.stack(rows, axis=1)
 
-    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
+    def run(
+        self,
+        x: jax.Array,
+        y: jax.Array,
+        x_mask: jax.Array | None = None,
+        y_mask: jax.Array | None = None,
+        **ignore,
+    ) -> jax.Array:
         """
         Estimate the discrete Frechet distance measure.
 
@@ -989,6 +1033,10 @@ class DiscreteFrechetDistance(DistanceMeasures):
             The input data point of shape (d, ) if particle, or (n_x, d) if time series.
         y: `jax.Array`
             The input data point of shape (d, ) if particle, or (n_y, d) if time series.
+        x_mask: `jax.Array`, optional, default = None
+            Padding mask of shape (n_x,) denoting truncation of time series x
+        y_mask: `jax.Array`, optional, default = None
+            Padding mask of shape (n_y,) denoting truncation of time series y
 
         Returns
         -------
@@ -1008,6 +1056,11 @@ class DiscreteFrechetDistance(DistanceMeasures):
         if y.ndim == 1:
             y = jnp.expand_dims(y, axis=0)
 
+        if x_mask is None:
+            x_mask = jnp.ones(x.shape[0], dtype=bool)
+        if y_mask is None:
+            y_mask = jnp.ones(y.shape[0], dtype=bool)
+
         def _body_fn(carry: Sequence, anti_diagonal: jax.Array) -> Any:
             two_ago, one_ago = carry
 
@@ -1021,7 +1074,7 @@ class DiscreteFrechetDistance(DistanceMeasures):
 
             return (one_ago, next_row), next_row
 
-        model_matrix = self.init_model_matrix(x, y)
+        model_matrix = self.init_model_matrix(x, y, x_mask, y_mask)
 
         init = (
             jnp.pad(model_matrix[0], (1, 0), constant_values=jnp.inf),
@@ -1057,6 +1110,7 @@ class OTTCostWrapper(CostFn):
     `OTTCostWrapper`
         An instance of the base cost function.
     """
+
     weights: Optional[Sequence[float]] = None
     distances: Optional[Sequence[DistanceMeasures]] = None
 
@@ -1174,6 +1228,7 @@ class SinkhornDistance(DistanceMeasures):
     epsilon: Optional[float] = struct.field(default=None, pytree_node=False)
     return_regularized_cost: bool = struct.field(default=False, pytree_node=False)
     low_rank: bool = struct.field(default=False, pytree_node=False)
+    padding_time: bool = struct.field(default=True, pytree_node=False)
 
     @classmethod
     def construct(
@@ -1204,7 +1259,11 @@ class SinkhornDistance(DistanceMeasures):
         if cost_fn is None:
             cost_fn = OTTCostWrapper.construct()
         rank = sinkhorn_params.pop("rank", 2)
-        solver = sinkhorn_lr.LRSinkhorn(rank=rank, **sinkhorn_params) if low_rank else sinkhorn.Sinkhorn(**sinkhorn_params)
+        solver = (
+            sinkhorn_lr.LRSinkhorn(rank=rank, **sinkhorn_params)
+            if low_rank
+            else sinkhorn.Sinkhorn(**sinkhorn_params)
+        )
 
         return cls(
             solver=solver,
@@ -1213,7 +1272,7 @@ class SinkhornDistance(DistanceMeasures):
             return_regularized_cost=return_regularized_cost,
         )
 
-    def init_geometry(self, x: jax.Array, y: jax.Array) -> Any:
+    def init_geometry(self, x: jax.Array, y: jax.Array, n_x, n_y) -> Any:
         """
         Initialize the geometry for the Sinkhorn distance measure.
 
@@ -1230,14 +1289,37 @@ class SinkhornDistance(DistanceMeasures):
             The geometry of the Sinkhorn distance measure.
         """
         # Add time to given arrays based on a linear interpolation
-        n_x = x.shape[0]
+        if self.padding_time:
+            end_time_x = (x.shape[0] - 1) / (n_x - 1)
+            end_time_y = (y.shape[0] - 1) / (n_y - 1)
+        else:
+            end_time_x = 1.0
+            end_time_y = 1.0
+
         x_extended = jnp.concatenate(
-            (x, jnp.linspace(0, 1, n_x)[:, jnp.newaxis]), axis=-1
+            (x, jnp.linspace(0, end_time_x, x.shape[0])[:, jnp.newaxis]), axis=-1
         )
-        n_y = y.shape[0]
         y_extended = jnp.concatenate(
-            (y, jnp.linspace(0, 1, n_y)[:, jnp.newaxis]), axis=-1
+            (y, jnp.linspace(0, end_time_y, y.shape[0])[:, jnp.newaxis]), axis=-1
         )
+
+        # 0 out all time steps after n_x and n_y
+        # x_extended = jnp.where(
+        #     jnp.tile(
+        #         jnp.arange(x_extended.shape[0])[:, None], (1, x_extended.shape[-1])
+        #     )
+        #     < n_x,
+        #     x_extended,
+        #     0.0,
+        # )
+        # y_extended = jnp.where(
+        #     jnp.tile(
+        #         jnp.arange(y_extended.shape[0])[:, None], (1, y_extended.shape[-1])
+        #     )
+        #     < n_y,
+        #     y_extended,
+        #     0.0,
+        # )
 
         # Generate and return a geometry for a Linear OT problem
         geometry = pointcloud.PointCloud(
@@ -1245,7 +1327,14 @@ class SinkhornDistance(DistanceMeasures):
         )
         return geometry
 
-    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
+    def run(
+        self,
+        x: jax.Array,
+        y: jax.Array,
+        x_mask: jax.Array | None = None,
+        y_mask: jax.Array | None = None,
+        **ignore,
+    ) -> jax.Array:
         """
         Estimate the Sinkhorn distance measure.
 
@@ -1255,6 +1344,10 @@ class SinkhornDistance(DistanceMeasures):
             The input data point of shape (d, ) if particle, or (n_x, d) if time series.
         y: `jax.Array`
             The input data point of shape (d, ) if particle, or (n_y, d) if time series.
+        x_mask: `jax.Array`, optional, default = None
+            Padding mask of shape (n_x,) denoting truncation of time series x
+        y_mask: `jax.Array`, optional, default = None
+            Padding mask of shape (n_y,) denoting truncation of time series y
 
         Returns
         -------
@@ -1274,9 +1367,24 @@ class SinkhornDistance(DistanceMeasures):
         if y.ndim == 1:
             y = jnp.expand_dims(y, axis=0)
 
-        geometry = self.init_geometry(x, y)
-        ot_problem = linear_problem.LinearProblem(geometry)
+        a = jnp.ones(x.shape[0])
+        if x_mask is None:
+            x_mask = jnp.ones(x.shape[0])
+        n_x = x_mask.sum()
+        a = a / n_x
+        a = jnp.where(x_mask, a, 0)
+
+        b = jnp.ones(y.shape[0])
+        if y_mask is None:
+            y_mask = jnp.ones(y.shape[0])
+        n_y = y_mask.sum()
+        b = b / n_y
+        b = jnp.where(y_mask, b, 0)
+
+        geometry = self.init_geometry(x, y, n_x, n_y)
+        ot_problem = linear_problem.LinearProblem(geometry, a, b)
         solution = self.solver(ot_problem)
         if self.return_regularized_cost:
             return solution.reg_ot_cost
+
         return jnp.sum(solution.matrix * solution.geom.cost_matrix)

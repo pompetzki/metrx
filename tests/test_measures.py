@@ -8,6 +8,12 @@ import jax.numpy as jnp
 
 import metrx
 from metrx import DistanceMeasures, StatisticalMeasures
+from metrx.distance_measures import (
+    DiscreteFrechetDistance,
+    DynamicTimeWarping,
+    SinkhornDistance,
+)
+from metrx.statistical_measures import MaximumMeanDiscrepancy
 
 
 CONFIG = {
@@ -231,3 +237,90 @@ def test_distances(dist_type: DistanceMeasures | StatisticalMeasures, name: str)
         assert np.allclose(
             data_jitted["median"], loaded["median"]
         ), f"{name} failed: Median not"
+
+
+@pytest.mark.parametrize(
+    "distance",
+    [
+        DynamicTimeWarping,
+        DiscreteFrechetDistance,
+        SinkhornDistance,
+    ],
+)
+def test_padding(distance):
+    distance_function = distance.construct()
+    name = distance.__name__
+
+    data = np.load(TEST_DIR_PATH / "test_datasets/data.npz")
+    x, y = data["x"], data["y"]
+    loaded = np.load(TEST_DIR_PATH / f"test_datasets/{name}.npz")
+
+    # create padding masks
+    x_mask = jnp.ones(x.shape[1], dtype=bool)
+    x_mask = jnp.pad(x_mask, (0, 10))
+    y_mask = jnp.ones(y.shape[1], dtype=bool)
+    y_mask = jnp.pad(y_mask, (0, 5))
+
+    # pad x and y
+    x = jnp.pad(x, ((0, 0), (0, 10), (0, 0)), mode="constant", constant_values=0.0)
+    y = jnp.pad(y, ((0, 0), (0, 5), (0, 0)), mode="constant", constant_values=0.0)
+
+    # Run distance function with padding masks
+    if isinstance(distance_function, DistanceMeasures):
+        costs = jax.jit(
+            jax.vmap(
+                jax.vmap(distance_function, in_axes=(None, 0, None, None)),
+                in_axes=(0, None, None, None),
+            )
+        )(x, y, x_mask, y_mask)
+    else:
+        costs = jax.jit(distance_function)(
+            x,
+            y,
+            jnp.tile(x_mask[None, :], (x.shape[0], 1)),
+            jnp.tile(y_mask[None, :], (y.shape[0], 1)),
+        )
+
+    data = dict(mean=np.mean(costs), std=np.std(costs), median=np.median(costs))
+
+    assert np.allclose(data["mean"], loaded["mean"]), f"{name} failed: Mean not close"
+    assert np.allclose(data["std"], loaded["std"]), f"{name} failed: Std not close"
+    assert np.allclose(
+        data["median"], loaded["median"]
+    ), f"{name} failed: Median not close"
+
+
+@pytest.mark.parametrize("distance", [MaximumMeanDiscrepancy])
+def test_padding_statistical_distances(distance):
+    distance_function = distance.construct()
+    name = distance.__name__
+
+    data = np.load(TEST_DIR_PATH / "test_datasets/data.npz")
+    x, y = data["x"], data["y"]
+    loaded = np.load(TEST_DIR_PATH / f"test_datasets/{name}.npz")
+
+    # create padding masks
+    x_mask = jnp.tile(jnp.ones(x.shape[1], dtype=bool)[None, :], (x.shape[0], 1))
+    x_mask = jnp.pad(x_mask, ((0, 3), (0, 10)))
+    y_mask = jnp.tile(jnp.ones(y.shape[1], dtype=bool)[None, :], (y.shape[0], 1))
+    y_mask = jnp.pad(y_mask, ((0, 4), (0, 10)))
+
+    # pad x and y
+    x = jnp.pad(x, ((0, 3), (0, 10), (0, 0)), mode="constant", constant_values=0.0)
+    y = jnp.pad(y, ((0, 4), (0, 10), (0, 0)), mode="constant", constant_values=0.0)
+
+    # Run distance function with padding masks
+    costs = distance_function(
+        x,
+        y,
+        x_mask,
+        y_mask,
+    )
+
+    data = dict(mean=np.mean(costs), std=np.std(costs), median=np.median(costs))
+
+    assert np.allclose(data["mean"], loaded["mean"]), f"{name} failed: Mean not close"
+    assert np.allclose(data["std"], loaded["std"]), f"{name} failed: Std not close"
+    assert np.allclose(
+        data["median"], loaded["median"]
+    ), f"{name} failed: Median not close"

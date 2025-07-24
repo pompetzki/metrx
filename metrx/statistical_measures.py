@@ -13,7 +13,11 @@ from ott.solvers.quadratic import gromov_wasserstein, gromov_wasserstein_lr
 from ott.geometry.costs import CostFn
 from ott.geometry import pointcloud
 
-from metrx.distance_measures import DistanceMeasures, SquaredEuclideanDistance, MinkowskiDistance
+from metrx.distance_measures import (
+    DistanceMeasures,
+    SquaredEuclideanDistance,
+    MinkowskiDistance,
+)
 from metrx.utils import fit_gaussian2data
 
 
@@ -501,7 +505,7 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
 
         return cls(distance=distance_measure, bandwidths=bandwidths, unbiased=unbiased)
 
-    def _mmd_kernel(self, x: jax.Array, y: jax.Array) -> jax.Array:
+    def _mmd_kernel(self, x: jax.Array, y: jax.Array, x_mask, y_mask) -> jax.Array:
         """
         Compute the Maximum Mean Discrepancy kernel between two time series data. Depending on the selected distance
         the two time series have to be of the same length (N_x = N_y), .e.g., the squared Euclidean distance. However,
@@ -519,9 +523,14 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         `jax.Array`
             The Maximum Mean Discrepancy kernel of shape (B_x, B_y).
         """
+
         distance_matrix = jax.vmap(
-            jax.vmap(self.distance, in_axes=(None, 0)), in_axes=(0, None)
-        )(x, y)
+            jax.vmap(
+                lambda x, y, xm, ym: self.distance(x, y, x_mask=xm, y_mask=ym),
+                in_axes=(None, 0, None, 0),
+            ),
+            in_axes=(0, None, 0, None),
+        )(x, y, x_mask, y_mask)
 
         def rbf_kernel(kernelized_dist: jax.Array, bandwidth: float) -> Any:
             return kernelized_dist + jnp.exp(-0.5 / bandwidth * distance_matrix), None
@@ -532,7 +541,13 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         )
         return kernelized_distance_matrix
 
-    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
+    def run(
+        self,
+        x: jax.Array,
+        y: jax.Array,
+        x_mask: jax.Array | None = None,
+        y_mask: jax.Array | None = None,
+    ) -> jax.Array:
         """
         Run the Maximum Mean Discrepancy measure.
 
@@ -558,31 +573,48 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
             f"The two batches need to be of shape (b, d, ) if particles, or (b, n, d) if time series data. "
             f"Got x = {x.shape} and y = {y.shape}."
         )
+
+        if x_mask is None:
+            x_mask = jnp.ones(x.shape[:-1], dtype=bool)
+
+        if y_mask is None:
+            y_mask = jnp.ones(y.shape[:-1], dtype=bool)
+
+        x_marginal_mask = jnp.any(x_mask, axis=-1)
+        y_marginal_mask = jnp.any(y_mask, axis=-1)
+        xx_mask = jnp.outer(x_marginal_mask, x_marginal_mask)
+        yy_mask = jnp.outer(y_marginal_mask, y_marginal_mask)
+        xy_mask = jnp.outer(x_marginal_mask, y_marginal_mask)
+        b_x, b_y = x_marginal_mask.sum(), y_marginal_mask.sum()
+
         if x.ndim == 2:
             x = x[..., jnp.newaxis, :]
         if y.ndim == 2:
             y = y[..., jnp.newaxis, :]
 
-        kxx = self._mmd_kernel(x, x)
+        kxx = self._mmd_kernel(x, x, x_mask, x_mask)
         i, j = jnp.diag_indices(kxx.shape[-1])
         kxx = kxx.at[..., i, j].set(0.0)
 
-        kyy = self._mmd_kernel(y, y)
+        kyy = self._mmd_kernel(y, y, y_mask, y_mask)
         i, j = jnp.diag_indices(kyy.shape[-1])
         kyy = kyy.at[..., i, j].set(0.0)
 
-        kxy = self._mmd_kernel(x, y)
+        kxy = self._mmd_kernel(x, y, x_mask, y_mask)
 
-        b_x, b_y = x.shape[0], y.shape[0]
         c_xy = 2.0 / (b_x * b_y)
         if self.unbiased:
-            c_xx = 1 / (b_x * (b_x - 1)) if b_x > 1 else 1 / b_x
-            c_yy = 1 / (b_y * (b_y - 1)) if b_y > 1 else 1 / b_y
+            c_xx = jax.lax.cond(b_x > 1, lambda: 1 / (b_x * (b_x - 1)), lambda: 1 / b_x)
+            c_yy = jax.lax.cond(b_y > 1, lambda: 1 / (b_y * (b_y - 1)), lambda: 1 / b_y)
         else:
             c_xx = 1 / b_x
             c_yy = 1 / b_y
 
-        return c_xx * jnp.sum(kxx) - c_xy * jnp.sum(kxy) + c_yy * jnp.sum(kyy)
+        return (
+            c_xx * jnp.sum(kxx * xx_mask)
+            - c_xy * jnp.sum(kxy * xy_mask)
+            + c_yy * jnp.sum(kyy * yy_mask)
+        )
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -664,7 +696,7 @@ class WassersteinDistance(StatisticalMeasures):
     def distance_measure(self):
         return self.cost_fn.distance_measure
 
-    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
+    def run(self, x: jax.Array, y: jax.Array, x_mask=None, y_mask=None) -> jax.Array:
         """
         Run the 1-Wasserstein distance.
 
@@ -682,14 +714,29 @@ class WassersteinDistance(StatisticalMeasures):
         `jax.Array`
             The 1-Wasserstein distance of shape ().
         """
+        a = jnp.ones(x.shape[0])
+        if x_mask is None:
+            x_mask = jnp.ones(x.shape[0])
+        a_mass = x_mask.sum()
+        a = a / a_mass
+        a = jnp.where(x_mask, a, 0)
+
+        b = jnp.ones(y.shape[0])
+        if y_mask is None:
+            y_mask = jnp.ones(y.shape[0])
+        b_mass = y_mask.sum()
+        b = b / b_mass
+        b = jnp.where(y_mask, b, 0)
+
         geom = pointcloud.PointCloud(x, y, cost_fn=self.cost_fn, epsilon=self.epsilon)
-        ot_prob = linear_problem.LinearProblem(geom)
+        ot_prob = linear_problem.LinearProblem(geom, a, b)
         out = self.solver(ot_prob)
 
         if self.return_regularized_cost:
             return out.reg_ot_cost
 
         return jnp.sum(out.matrix * out.geom.cost_matrix)
+
 
 # --------------------------------------------------------------------------------------------------------------------
 # ------------------------------------------------- Gromov-Wasserstein Distance --------------------------------------
@@ -778,7 +825,9 @@ class GromovWassersteinDistance(StatisticalMeasures):
             solver = gromov_wasserstein_lr.LRGromovWasserstein(rank, **gromov_params)
         else:
             sinkhorn_solver = sinkhorn.Sinkhorn(**sinkhorn_params)
-            solver = gromov_wasserstein.GromovWasserstein(sinkhorn_solver, **gromov_params)
+            solver = gromov_wasserstein.GromovWasserstein(
+                sinkhorn_solver, **gromov_params
+            )
 
         return cls(
             solver=solver,
@@ -787,7 +836,7 @@ class GromovWassersteinDistance(StatisticalMeasures):
             return_regularized_cost=return_regularized_cost,
         )
 
-    def run(self, x: jax.Array, y: jax.Array) -> jax.Array:
+    def run(self, x: jax.Array, y: jax.Array, x_mask=None, y_mask=None) -> jax.Array:
         """
         Run the Gromov-Wasserstein distance measure.
 
@@ -805,11 +854,24 @@ class GromovWassersteinDistance(StatisticalMeasures):
         `jax.Array`
             The Gromov-Wasserstein distance measure of shape ().
         """
+        a = jnp.ones(x.shape[0])
+        if x_mask is None:
+            x_mask = jnp.ones(x.shape[0])
+        a_mass = x_mask.sum()
+        a = a / a_mass
+        a = jnp.where(x_mask, a, 0)
+
+        b = jnp.ones(y.shape[0])
+        if y_mask is None:
+            y_mask = jnp.ones(y.shape[0])
+        b_mass = y_mask.sum()
+        b = b / b_mass
+        b = jnp.where(y_mask, b, 0)
 
         geom_xx = pointcloud.PointCloud(x, cost_fn=self.cost_fn, epsilon=self.epsilon)
         geom_yy = pointcloud.PointCloud(y, cost_fn=self.cost_fn, epsilon=self.epsilon)
 
-        ot_problem = quadratic_problem.QuadraticProblem(geom_xx, geom_yy)
+        ot_problem = quadratic_problem.QuadraticProblem(geom_xx, geom_yy, a=a, b=b)
 
         solution = self.solver(ot_problem)
         if self.return_regularized_cost:
