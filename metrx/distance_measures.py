@@ -774,7 +774,7 @@ class DynamicTimeWarping(DistanceMeasures):
 
     References
     ----------
-    [1] T. K. Vintsyuk. Speech discrimination by dynamic programming. Cybernetics, 4(1):52–57,1968.
+    [1] T. K. Vintsyuk. Speech discrimination by dynamic programming. Cybernetics, 4(1):52-57,1968.
         Available: https://link.springer.com/article/10.1007/BF01074755
     [2] H. Sakoe and S. Chiba. Dynamic programming algorithm optimization for spoken word recognition.
         IEEE transactions on acoustics, speech, and signal processing, 26(1):43–49, 1978.
@@ -892,6 +892,8 @@ class DynamicTimeWarping(DistanceMeasures):
         if y_mask is None:
             y_mask = jnp.ones(y.shape[0], dtype=bool)
 
+        n_x, n_y = x_mask.sum(), y_mask.sum()
+
         def _body_fn(carry: Sequence, anti_diagonal: jax.Array) -> Any:
             two_ago, one_ago = carry
 
@@ -913,8 +915,8 @@ class DynamicTimeWarping(DistanceMeasures):
                 model_matrix[1] + model_matrix[0, 0], (1, 0), constant_values=jnp.inf
             ),
         )
-        carry, _ = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
-        return carry[1][-1]
+        _, out = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
+        return out[n_x + n_y - 4, n_x]
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -1061,6 +1063,8 @@ class DiscreteFrechetDistance(DistanceMeasures):
         if y_mask is None:
             y_mask = jnp.ones(y.shape[0], dtype=bool)
 
+        n_x, n_y = x_mask.sum(), y_mask.sum()
+
         def _body_fn(carry: Sequence, anti_diagonal: jax.Array) -> Any:
             two_ago, one_ago = carry
 
@@ -1085,8 +1089,8 @@ class DiscreteFrechetDistance(DistanceMeasures):
             ),
         )
 
-        carry, ys = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
-        return carry[1][-1]
+        _, ys = jax.lax.scan(_body_fn, init, model_matrix[2:], unroll=2)
+        return ys[n_x + n_y - 4, n_x]
 
 
 # --------------------------------------------------------------------------------------------------------------------
