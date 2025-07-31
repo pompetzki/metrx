@@ -5,13 +5,12 @@ import distrax
 import jax
 import jax.numpy as jnp
 from flax import struct
-from ott.geometry import pointcloud
+from ott.geometry import pointcloud, geometry
 from ott.solvers.linear import sinkhorn, sinkhorn_lr
 from ott.problems.linear import linear_problem
 from ott.problems.quadratic import quadratic_problem
 from ott.solvers.quadratic import gromov_wasserstein, gromov_wasserstein_lr
 from ott.geometry.costs import CostFn
-from ott.geometry import pointcloud
 
 from metrx.distance_measures import (
     DistanceMeasures,
@@ -715,21 +714,39 @@ class WassersteinDistance(StatisticalMeasures):
         `jax.Array`
             The 1-Wasserstein distance of shape ().
         """
-        a = jnp.ones(x.shape[0])
+        if x.ndim == 2:
+            x = x[..., jnp.newaxis, :]
+        if y.ndim == 2:
+            y = y[..., jnp.newaxis, :]
+
         if x_mask is None:
-            x_mask = jnp.ones(x.shape[0])
-        a_mass = x_mask.sum()
+            x_mask = jnp.ones(x.shape[:-1], dtype=bool)
+        if y_mask is None:
+            y_mask = jnp.ones(y.shape[:-1], dtype=bool)
+        x_marginal_mask = jnp.any(x_mask, axis=-1)
+        y_marginal_mask = jnp.any(y_mask, axis=-1)
+
+        a = jnp.ones(x.shape[0])
+        a_mass = x_marginal_mask.sum()
         a = a / a_mass
-        a = jnp.where(x_mask, a, 0)
+        a = jnp.where(x_marginal_mask, a, 0)
 
         b = jnp.ones(y.shape[0])
-        if y_mask is None:
-            y_mask = jnp.ones(y.shape[0])
-        b_mass = y_mask.sum()
+        b_mass = y_marginal_mask.sum()
         b = b / b_mass
-        b = jnp.where(y_mask, b, 0)
+        b = jnp.where(y_marginal_mask, b, 0)
 
-        geom = pointcloud.PointCloud(x, y, cost_fn=self.cost_fn, epsilon=self.epsilon)
+        cost_matrix = jax.vmap(
+            jax.vmap(
+                lambda x, y, xm, ym: self.cost_fn.distance_measure(
+                    x, y, x_mask=xm, y_mask=ym
+                ),
+                in_axes=(None, 0, None, 0),
+            ),
+            in_axes=(0, None, 0, None),
+        )(x, y, x_mask, y_mask)
+
+        geom = geometry.Geometry(cost_matrix, epsilon=self.epsilon)
         ot_prob = linear_problem.LinearProblem(geom, a, b)
         out = self.solver(ot_prob)
 

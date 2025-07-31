@@ -13,7 +13,7 @@ from metrx.distance_measures import (
     DynamicTimeWarping,
     SinkhornDistance,
 )
-from metrx.statistical_measures import MaximumMeanDiscrepancy
+from metrx.statistical_measures import MaximumMeanDiscrepancy, WassersteinDistance
 
 
 CONFIG = {
@@ -290,7 +290,7 @@ def test_padding(distance):
     ), f"{name} failed: Median not close"
 
 
-@pytest.mark.parametrize("distance", [MaximumMeanDiscrepancy])
+@pytest.mark.parametrize("distance", [MaximumMeanDiscrepancy, WassersteinDistance])
 def test_padding_statistical_distances(distance):
     distance_function = distance.construct()
     name = distance.__name__
