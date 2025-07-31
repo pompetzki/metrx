@@ -539,6 +539,7 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         kernelized_distance_matrix, _ = jax.lax.scan(
             rbf_kernel, kernelized_distance_matrix, jnp.array(self.bandwidths)
         )
+        kernelized_distance_matrix /= len(self.bandwidths)
         return kernelized_distance_matrix
 
     def run(
@@ -574,6 +575,11 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
             f"Got x = {x.shape} and y = {y.shape}."
         )
 
+        if x.ndim == 2:
+            x = x[..., jnp.newaxis, :]
+        if y.ndim == 2:
+            y = y[..., jnp.newaxis, :]
+
         if x_mask is None:
             x_mask = jnp.ones(x.shape[:-1], dtype=bool)
 
@@ -586,11 +592,6 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         yy_mask = jnp.outer(y_marginal_mask, y_marginal_mask)
         xy_mask = jnp.outer(x_marginal_mask, y_marginal_mask)
         b_x, b_y = x_marginal_mask.sum(), y_marginal_mask.sum()
-
-        if x.ndim == 2:
-            x = x[..., jnp.newaxis, :]
-        if y.ndim == 2:
-            y = y[..., jnp.newaxis, :]
 
         kxx = self._mmd_kernel(x, x, x_mask, x_mask)
         i, j = jnp.diag_indices(kxx.shape[-1])
