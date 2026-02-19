@@ -594,11 +594,9 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
 
         kxx = self._mmd_kernel(x, x, x_mask, x_mask)
         i, j = jnp.diag_indices(kxx.shape[-1])
-        kxx = kxx.at[..., i, j].set(0.0)
 
         kyy = self._mmd_kernel(y, y, y_mask, y_mask)
         i, j = jnp.diag_indices(kyy.shape[-1])
-        kyy = kyy.at[..., i, j].set(0.0)
 
         kxy = self._mmd_kernel(x, y, x_mask, y_mask)
 
@@ -606,9 +604,11 @@ class MaximumMeanDiscrepancy(StatisticalMeasures):
         if self.unbiased:
             c_xx = jax.lax.cond(b_x > 1, lambda: 1 / (b_x * (b_x - 1)), lambda: 1 / b_x)
             c_yy = jax.lax.cond(b_y > 1, lambda: 1 / (b_y * (b_y - 1)), lambda: 1 / b_y)
+            kxx = jax.lax.cond(b_x > 1, lambda: kxx.at[..., i, j].set(0.0), lambda: kxx)
+            kyy = jax.lax.cond(b_y > 1, lambda: kyy.at[..., i, j].set(0.0), lambda: kyy)
         else:
-            c_xx = 1 / b_x
-            c_yy = 1 / b_y
+            c_xx = 1 / (b_x**2)
+            c_yy = 1 / (b_y**2)
 
         return (
             c_xx * jnp.sum(kxx * xx_mask)
@@ -746,6 +746,8 @@ class WassersteinDistance(StatisticalMeasures):
             in_axes=(0, None, 0, None),
         )(x, y, x_mask, y_mask)
 
+        if cost_matrix.size == 1:
+            return cost_matrix.squeeze()
         geom = geometry.Geometry(cost_matrix, epsilon=self.epsilon)
         ot_prob = linear_problem.LinearProblem(geom, a, b)
         out = self.solver(ot_prob)

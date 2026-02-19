@@ -355,7 +355,13 @@ class EuclideanDistance(DistanceMeasures):
             x = jnp.expand_dims(x, axis=0)  # (n = 1, d)
             y = jnp.expand_dims(y, axis=0)  # (n = 1, d)
 
-        distance = jnp.linalg.norm(x - y, axis=-1)  # (n, )
+        x_sq_norm = jnp.sum(jnp.square(x), axis=-1)
+        y_sq_norm = jnp.sum(jnp.square(y), axis=-1)
+        dot_prod = jnp.einsum("...i,...i->...", x, y)
+        sq_dist = x_sq_norm + y_sq_norm - 2.0 * dot_prod
+        distance = jnp.sqrt(jnp.maximum(sq_dist, 1e-12))
+
+        # distance = jnp.linalg.norm(x - y, axis=-1)  # (n, )
         if self.mean:
             return jnp.mean(distance, axis=-1)
         elif self.median:
