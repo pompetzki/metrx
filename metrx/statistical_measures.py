@@ -405,12 +405,18 @@ class FrechetInceptionDistance(StatisticalMeasures):
         cov_y = jnp.einsum("...mi, ...ni -> ...mn", tri_lower_y, tri_lower_y)
         trace_cov_y = jax.vmap(jnp.trace)(cov_y)
 
-        cov_product = jnp.einsum("...mi, ...ni -> ...mn", cov_x, cov_y)
-        eig_vals, eig_vecs = jax.vmap(jnp.linalg.eigh)(cov_product)
-        sqrt_cov_product = jnp.einsum(
-            "...mj,...j, ...nj->...mn", eig_vecs, jnp.sqrt(eig_vals), eig_vecs
-        )
-        trace_sqrt_product = jax.vmap(jnp.trace)(sqrt_cov_product)
+        # cov_product = jnp.einsum("...mi, ...ni -> ...mn", cov_x, cov_y)
+        m = jnp.einsum("...im, ...in -> ...mn", tri_lower_x, tri_lower_y)
+        mmt = jnp.einsum("...mi, ...ni -> ...mn", m, m)
+        eig_vals, _ = jax.vmap(jnp.linalg.eigh)(mmt)
+        eig_vals = jnp.clip(eig_vals, a_min=0.0)
+        trace_sqrt_product = jnp.sum(jnp.sqrt(eig_vals), axis=-1)
+
+        # eig_vals, eig_vecs = jax.vmap(jnp.linalg.eigh)(cov_product)
+        # sqrt_cov_product = jnp.einsum(
+        #     "...mj,...j, ...nj->...mn", eig_vecs, jnp.sqrt(eig_vals), eig_vecs
+        # )
+        # trace_sqrt_product = jax.vmap(jnp.trace)(sqrt_cov_product)
 
         distances = mean_diff + self.alpha * (
             trace_cov_x + trace_cov_y - 2 * trace_sqrt_product
